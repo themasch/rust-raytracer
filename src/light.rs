@@ -21,14 +21,14 @@ impl Light {
   pub fn color(&self) -> &Color {
     match *self {
       Light::Directional(ref s) => &s.color
-    } 
+    }
   }
 }
 
 #[derive(Debug)]
 pub struct DirectionalLight {
-   pub direction: Direction,
-   pub color: Color,
-   pub intensity: f32
+    pub direction: Direction,
+    pub color: Color,
+    pub intensity: f32
 }
 

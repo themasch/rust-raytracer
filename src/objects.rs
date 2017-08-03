@@ -1,4 +1,4 @@
-use raycast::{Intersectable,Intersection,Ray};
+use raycast::{Intersectable, Intersection, Ray};
 use types::{Color, Point, Direction};
 use cgmath::prelude::*;
 use cgmath::Vector3;
@@ -13,8 +13,8 @@ pub struct TextureCoords {
 }
 
 pub enum Coloration {
-  Color(Color),
-  Texture(DynamicImage)
+    Color(Color),
+    Texture(DynamicImage)
 }
 
 fn wrap(val: f32, bound: u32) -> u32 {
@@ -68,8 +68,8 @@ impl Material {
 }
 
 pub enum Object {
-  Sphere(Sphere),
-  Plane(Plane)
+    Sphere(Sphere),
+    Plane(Plane)
 }
 
 impl Object {
@@ -147,28 +147,28 @@ impl Intersectable for Sphere {
 }
 
 pub struct Plane {
-  pub origin: Point, 
-  pub normal: Direction,
+    pub origin: Point,
+    pub normal: Direction,
     pub material: Material
 }
 
 impl Intersectable for Plane {
-  fn intersect(&self, ray: &Ray) -> Option<f64> {
-    let normal = self.normal;
-    let denom = normal.dot(ray.direction);
-    if denom > 1e-6 {
-      let v = self.origin - ray.origin;
-      let distance = v.dot(normal) / denom;
-      if distance >= 0.0 {
-        return Some(distance);
-      }
+    fn intersect(&self, ray: &Ray) -> Option<f64> {
+        let normal = self.normal;
+        let denom = normal.dot(ray.direction);
+        if denom > 1e-6 {
+            let v = self.origin - ray.origin;
+            let distance = v.dot(normal) / denom;
+            if distance >= 0.0 {
+                return Some(distance);
+            }
+        }
+        None
     }
-    None
-  }
 
-  fn surface_normal(&self, _: &Point) -> Direction {
-    -self.normal
-  }
+    fn surface_normal(&self, _: &Point) -> Direction {
+        -self.normal
+    }
 
     fn texture_coord(&self, hit_point: &Point) -> TextureCoords {
         let mut x_axis = self.normal.cross(Vector3 {
@@ -196,11 +196,11 @@ impl Intersectable for Plane {
 }
 
 pub struct Scene {
-  pub width: u32,
-  pub height: u32,
-  pub fov: f64,
-  pub objects: Vec<Object>,
-  pub lights: Vec<Light>
+    pub width: u32,
+    pub height: u32,
+    pub fov: f64,
+    pub objects: Vec<Object>,
+    pub lights: Vec<Light>
 }
 
 impl Scene {
@@ -218,46 +218,46 @@ impl Scene {
 }
 
 pub struct SceneBuilder {
-  width: u32, 
-  height:u32,
-  fov: f64, 
-  objects: Vec<Object>,
-  lights: Vec<Light>
+    width: u32,
+    height: u32,
+    fov: f64,
+    objects: Vec<Object>,
+    lights: Vec<Light>
 }
 
 impl SceneBuilder {
-  pub fn new(width: u32, height: u32) -> SceneBuilder {
-    SceneBuilder {
-      width: width, 
-      height: height,
-      fov: 90.0,
-      objects: Vec::new(),
-      lights: Vec::new()
+    pub fn new(width: u32, height: u32) -> SceneBuilder {
+        SceneBuilder {
+            width: width,
+            height: height,
+            fov: 90.0,
+            objects: Vec::new(),
+            lights: Vec::new()
+        }
     }
-  }
 
-  pub fn with_fov(mut self, fov: f64) -> SceneBuilder {
-    self.fov = fov;
-    self   
-  }
-
-  pub fn add_object(mut self, obj: Object) -> SceneBuilder {
-    self.objects.push(obj);
-    self
-  }
-
-  pub fn add_light(mut self, light: Light) -> SceneBuilder {
-    self.lights.push(light);
-    self
-  }
-
-  pub fn finish(self) -> Scene {
-    Scene {
-      width: self.width,
-      height: self.height,
-      fov: self.fov,
-      objects: self.objects,
-      lights: self.lights
+    pub fn with_fov(mut self, fov: f64) -> SceneBuilder {
+        self.fov = fov;
+        self
     }
-  }
+
+    pub fn add_object(mut self, obj: Object) -> SceneBuilder {
+        self.objects.push(obj);
+        self
+    }
+
+    pub fn add_light(mut self, light: Light) -> SceneBuilder {
+        self.lights.push(light);
+        self
+    }
+
+    pub fn finish(self) -> Scene {
+        Scene {
+            width: self.width,
+            height: self.height,
+            fov: self.fov,
+            objects: self.objects,
+            lights: self.lights
+        }
+    }
 }
