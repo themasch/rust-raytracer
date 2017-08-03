@@ -12,6 +12,11 @@ pub struct TextureCoords {
     pub y: f32
 }
 
+pub enum SurfaceType {
+    Diffuse,
+    Reflective { reflectivity: f32 }
+}
+
 pub enum Coloration {
     Color(Color),
     Texture(DynamicImage)
@@ -44,25 +49,36 @@ impl Coloration {
 
 pub struct Material {
     pub color: Coloration,
-    pub albedo: f32
+    pub albedo: f32,
+    pub surface: SurfaceType
 }
 
 impl Material {
     pub fn new(color: Coloration, albedo: f32) -> Material {
-        Material { color, albedo }
+        Material { color, albedo, surface: SurfaceType::Diffuse }
     }
 
     pub fn diffuse_color(color: Color, albedo: f32) -> Material {
         Material {
             color: Coloration::Color(color),
-            albedo
+            albedo,
+            surface: SurfaceType::Diffuse
+        }
+    }
+
+    pub fn reflective_color(color: Color, albedo: f32, refl: f32) -> Material {
+        Material {
+            color: Coloration::Color(color),
+            albedo,
+            surface: SurfaceType::Reflective { reflectivity: refl }
         }
     }
 
     pub fn diffuse_texture(image: DynamicImage, albedo: f32) -> Material {
         Material {
             color: Coloration::Texture(image),
-            albedo
+            albedo,
+            surface: SurfaceType::Diffuse
         }
     }
 }

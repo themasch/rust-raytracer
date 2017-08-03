@@ -1,5 +1,7 @@
 extern crate image;
 extern crate cgmath;
+extern crate threadpool;
+extern crate num_cpus;
 
 mod types;
 mod raycast;
@@ -32,17 +34,17 @@ fn main() {
         .add_object(Object::Sphere(Sphere {
             center: Point::new(-1.0, 0.0, -9.0),
             radius: 3.0,
-            material: Material::diffuse_color(Color::from_rgb(1.0, 0.1, 0.1), 0.1)
+            material: Material::reflective_color(Color::from_rgb(1.0, 0.1, 0.1), 0.3, 0.3)
         }))
         .add_object(Object::Plane(Plane {
             origin: Point::new(0.0, 0.0, -20.0),
             normal: Direction::new(0.0, 0.0, -1.0).normalize(),
-            material: Material::diffuse_color(Color::from_rgb(0.0, 0.0, 1.0), 0.2)
+            material: Material::diffuse_color(Color::from_rgb(0.0, 0.0, 1.0), 0.3)
         }))
         .add_object(Object::Plane(Plane {
             origin: Point::new(0.0, -2.0, -5.0),
             normal: Direction::new(0.0, -1.0, 0.0).normalize(),
-            material: Material::diffuse_color(Color::from_rgb(0.1, 0.3, 0.6), 0.2)
+            material: Material::reflective_color(Color::from_rgb(0.1, 0.3, 0.6), 0.3, 0.1)
         }))
         .add_light(Light::Directional(DirectionalLight {
             direction: Direction::new(0.0, -0.5, -1.0),

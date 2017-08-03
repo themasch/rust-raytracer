@@ -70,5 +70,12 @@ impl Ray {
             }.normalize()
         }
     }
+
+    pub fn create_reflection(ray_direction: &Direction, int: &Intersection) -> Ray {
+        Ray {
+            origin: int.hit_point() + (int.direction * 1e-13),
+            direction: ray_direction - (2.0 * ray_direction.dot(int.direction) * int.direction)
+        }
+    }
 }
 

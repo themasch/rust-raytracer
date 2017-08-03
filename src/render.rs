@@ -4,10 +4,13 @@ use std::sync::mpsc::channel;
 use std::time::{Duration, Instant};
 use std::thread;
 use std::f32::consts::PI;
+use std::cmp::min;
 
 use cgmath::prelude::*;
+use threadpool::ThreadPool;
+use num_cpus;
 
-use objects::Scene;
+use objects::{Scene, SurfaceType};
 use raycast::{Ray,Intersection};
 use image::{DynamicImage, GenericImage};
 use types::Color;
@@ -16,7 +19,8 @@ fn format_time(duration: &Duration) -> f64 {
     duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9
 }
 
-fn get_color(scene: &Scene, intersection: &Intersection) -> Color {
+
+fn shade_diffuse(scene: &Scene, intersection: &Intersection) -> Color {
     let mut color = Color::from_rgb(0.0, 0.0, 0.0);
 
     for light in &scene.lights {
@@ -39,55 +43,75 @@ fn get_color(scene: &Scene, intersection: &Intersection) -> Color {
     color
 }
 
+fn get_color(scene: &Scene, ray: &Ray, intersection: &Intersection, depth: u32) -> Color {
+    let mut color = shade_diffuse(scene, intersection);
+    if let SurfaceType::Reflective { reflectivity } = intersection.object().material().surface {
+        let reflection_ray = Ray::create_reflection(&ray.direction, intersection);
+        let reflection_color = cast_ray(scene, &reflection_ray, depth + 1) * reflectivity;
+        color = color * (1.0 * reflectivity) + reflection_color
+    }
+
+    color
+}
+
+pub fn cast_ray(scene: &Scene, ray: &Ray, depth: u32) -> Color {
+    if depth >= 32 {
+        return Color::from_rgb(0.0, 0.0, 0.0);
+    }
+
+    scene.trace(&ray)
+        .map(|int| get_color(scene, &ray, &int, depth))
+        .unwrap_or(Color::from_rgb(0.0, 0.0, 0.0))
+}
+
 pub fn render(scene: Scene) -> DynamicImage {
+    let workers = num_cpus::get();
+    let pool = ThreadPool::new(workers);
+
     let sw = scene.width;
     let sh = scene.height;
-    let tw = sw / 2;
-    let th = sh / 2;
 
-    let mut children = Vec::new();
+    let tile_size = 128;
+    let cols = (scene.width as f32 / tile_size as f32).ceil() as u32;
+    let rows = (scene.height as f32 / tile_size as f32).ceil() as u32;
+    let jobs = cols * rows;
     let asc = Arc::new(scene);
 
-    for t in 0..4 {
-        let mx = tw * (t % 2);
-        let my = th * (t / 2);
-        let black = Color::from_rgb(0.0, 0.0, 0.0);
-        let start = Instant::now();
-        let (tx, rx) = channel();
+    let (tx, rx) = channel();
+    for job_idx in 0..jobs {
+        let mx = tile_size * (job_idx % cols);
+        let my = tile_size * (job_idx / cols);
+        let black = Color::from_rgb(0.0, 0.0, 0.0).to_rgba8();
         let mscene = asc.clone();
-        let child = thread::spawn(move || {
-            let mut image = DynamicImage::new_rgb8(tw, th);
-            for x in 0..tw {
-                for y in 0..th {
+        let tx = tx.clone();
+        pool.execute(move || {
+            let tile_width = min((mx + tile_size), sw) - mx;
+            let tile_height = min((my + tile_size), sh) - my;
+            let mut image = DynamicImage::new_rgb8(tile_width, tile_height);
+            for x in 0..tile_width {
+                for y in 0..tile_height {
                     let ray = Ray::create_prime(mx + x, my + y, &*mscene);
 
                     if let Some(inter) = mscene.trace(&ray) {
-                        let color = get_color(&*mscene, &inter);
+                        let color = get_color(&*mscene, &ray, &inter, 0);
                         image.put_pixel(x, y, color.clamp().to_rgba8());
                     } else {
-                        image.put_pixel(x, y, black.to_rgba8());
+                        image.put_pixel(x, y, black);
                     }
                 }
             }
-            tx.send(image).unwrap();
+            tx.send((image, mx, my)).unwrap();
         });
-
-        children.push((rx, child, mx, my, start));
     }
 
-    let mut image = DynamicImage::new_rgb8(sw, sh);
-    for (rx, child, mx, my, start_time) in children {
-        let region = rx.recv().unwrap();
-        let before_copy = Instant::now();
-        image.copy_from(&region, mx, my);
-        let tdur = start_time.elapsed();
-        let duration = before_copy.elapsed();
-        println!(
-            "copy image: {:?}, thread time: {:?}",
-            format_time(&duration), format_time(&tdur)
-        );
-        let _ = child.join();
-    }
-
-  image
+    rx.iter()
+        .take(jobs as usize)
+        .fold(
+            DynamicImage::new_rgb8(sw, sh),
+            |mut image, result| {
+                let (part, x, y) = result;
+                image.copy_from(&part, x, y);
+                image
+            }
+        )
 }
