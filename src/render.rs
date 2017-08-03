@@ -30,7 +30,7 @@ fn get_color(scene: &Scene, intersection: &Intersection) -> Color {
 
         let light_intensity = if in_light { light.intensity() } else { 0.0 };
         let light_power = (intersection.direction().dot(direction_to_light) as f32).max(0.0) * light_intensity;
-        let light_reflected = 0.10 / PI;
+        let light_reflected = intersection.object().material().albedo / PI;
 
 
         color = color + (intersection.object().color(&intersection.texture_coord()).clone() * light.color().clone() * light_power * light_reflected);

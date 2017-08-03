@@ -31,8 +31,8 @@ fn main() {
         }))
         .add_object(Object::Sphere(Sphere {
             center: Point::new(-1.0, 0.0, -9.0),
-            radius: 2.0,
-            material: Material::diffuse_color(Color::from_rgb(1.0, 0.1, 0.1), 0.2)
+            radius: 3.0,
+            material: Material::diffuse_color(Color::from_rgb(1.0, 0.1, 0.1), 0.1)
         }))
         .add_object(Object::Plane(Plane {
             origin: Point::new(0.0, 0.0, -20.0),

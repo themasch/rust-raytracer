@@ -79,6 +79,13 @@ impl Object {
             Object::Plane(ref p) => p.material.color.color(coords)
         }
     }
+
+    pub fn material(&self) -> &Material {
+        match *self {
+            Object::Sphere(ref s) => &s.material,
+            Object::Plane(ref p) => &p.material
+        }
+    }
 }
 
 impl Intersectable for Object {
