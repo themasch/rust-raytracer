@@ -1,6 +1,6 @@
 use types::{Direction,Point};
 use cgmath::prelude::*;
-use objects::{Object, Scene};
+use objects::{Object, Scene, TextureCoords};
 
 use std::cmp::Ordering;
 
@@ -8,15 +8,17 @@ pub struct Intersection<'a> {
   distance: f64,
   direction: Direction,
   hit_point: Point,
+  tex_coord: TextureCoords,
   object: &'a Object
 }
 
 impl<'a> Intersection<'a> {
-  pub fn new<'b>(distance: f64, hit_point: Point, direction: Direction, object: &'b Object) -> Intersection<'b> {
+  pub fn new<'b>(distance: f64, hit_point: Point, tex_coord: TextureCoords, direction: Direction, object: &'b Object) -> Intersection<'b> {
     Intersection { 
       distance,
       hit_point,
       direction,
+      tex_coord,
       object
     }
   }
@@ -36,12 +38,15 @@ impl<'a> Intersection<'a> {
   pub fn direction(&self) -> Direction {
     self.direction
   }
+
+  pub fn texture_coord(&self) -> &TextureCoords { &self.tex_coord }
 }
 
 pub trait Intersectable {
   fn intersect(&self, ray: &Ray) -> Option<f64>;
 
   fn surface_normal(&self, hit_point: &Point) -> Direction;
+  fn texture_coord(&self, hit_point: &Point) -> TextureCoords;
 }
 
 pub struct Ray {

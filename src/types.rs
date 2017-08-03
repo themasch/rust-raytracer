@@ -14,6 +14,14 @@ impl Color {
     Color { red: r, green: g, blue: b } 
   }
 
+    pub fn from_rgba(source: Rgba<u8>) -> Color {
+        Color {
+            red: source.data[0] as f32 / 255.0,
+            green: source.data[1] as f32 / 255.0,
+            blue: source.data[2] as f32 / 255.0,
+        }
+    }
+
   pub fn to_rgba8(&self) -> Rgba<u8> {
     Rgba { 
       data: [

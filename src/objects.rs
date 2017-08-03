@@ -1,97 +1,155 @@
 use raycast::{Intersectable,Intersection,Ray};
 use types::{Color, Point, Direction};
 use cgmath::prelude::*;
+use cgmath::Vector3;
 use light::Light;
+use image::{DynamicImage, GenericImage};
 
+use std::f32::consts::PI;
 
+pub struct TextureCoords {
+    pub x: f32,
+    pub y: f32
+}
 
-#[derive(Debug)]
-pub struct Coloration {
+pub enum Coloration {
   Color(Color),
   Texture(DynamicImage)
 }
 
+fn wrap(val: f32, bound: u32) -> u32 {
+    let signed_bound = bound as i32;
+    let float_coord = val * bound as f32;
+    let wrapped_coord = (float_coord as i32) % signed_bound;
+    if wrapped_coord < 0 {
+        (wrapped_coord + signed_bound) as u32
+    } else {
+        wrapped_coord as u32
+    }
+}
+
 impl Coloration {
-  
+    pub fn color(&self, coords: &TextureCoords) -> Color {
+        match *self {
+            Coloration::Color(ref c) => c.clone(),
+            Coloration::Texture(ref tex) => {
+                let tex_x = wrap(coords.x, tex.width());
+                let tex_y = wrap(coords.y, tex.height());
+
+                Color::from_rgba(tex.get_pixel(tex_x, tex_y))
+            }
+        }
+    }
 }
 
-#[derive(Debug)]
 pub struct Material {
-  pub color: Coloration,
-  pub albedo: f32
+    pub color: Coloration,
+    pub albedo: f32
 }
 
-#[derive(Debug)]
+impl Material {
+    pub fn new(color: Coloration, albedo: f32) -> Material {
+        Material { color, albedo }
+    }
+
+    pub fn diffuse_color(color: Color, albedo: f32) -> Material {
+        Material {
+            color: Coloration::Color(color),
+            albedo
+        }
+    }
+
+    pub fn diffuse_texture(image: DynamicImage, albedo: f32) -> Material {
+        Material {
+            color: Coloration::Texture(image),
+            albedo
+        }
+    }
+}
+
 pub enum Object {
   Sphere(Sphere),
   Plane(Plane)
 }
 
 impl Object {
-  pub fn color(&self) -> &Color {
-    match *self {
-      Object::Sphere(ref s) => &s.color,
-      Object::Plane(ref p) => &p.color
+    pub fn color(&self, coords: &TextureCoords) -> Color {
+        match *self {
+            Object::Sphere(ref s) => s.material.color.color(coords),
+            Object::Plane(ref p) => p.material.color.color(coords)
+        }
     }
-  }
 }
 
 impl Intersectable for Object {
-  fn intersect(&self, ray: &Ray) -> Option<f64> {
-    match *self {
-      Object::Sphere(ref s) => s.intersect(ray),
-      Object::Plane(ref p) => p.intersect(ray)
+    fn intersect(&self, ray: &Ray) -> Option<f64> {
+        match *self {
+            Object::Sphere(ref s) => s.intersect(ray),
+            Object::Plane(ref p) => p.intersect(ray)
+        }
     }
-  }
 
-  fn surface_normal(&self, hit_point: &Point) -> Direction {
-    match *self {
-      Object::Sphere(ref s) => s.surface_normal(hit_point),
-      Object::Plane(ref p) => p.surface_normal(hit_point)
+    fn surface_normal(&self, hit_point: &Point) -> Direction {
+        match *self {
+            Object::Sphere(ref s) => s.surface_normal(hit_point),
+            Object::Plane(ref p) => p.surface_normal(hit_point)
+        }
     }
-  }
+
+    fn texture_coord(&self, hit_point: &Point) -> TextureCoords {
+        match *self {
+            Object::Sphere(ref s) => s.texture_coord(hit_point),
+            Object::Plane(ref p) => p.texture_coord(hit_point)
+        }
+    }
 }
 
-#[derive(Debug)]
 pub struct Sphere {
-  pub center: Point,
-  pub radius: f64, 
-  pub material: Material
+    pub center: Point,
+    pub radius: f64,
+    pub material: Material
 }
 
 impl Intersectable for Sphere {
-  fn intersect(&self, ray: &Ray) -> Option<f64> {
-    let l = self.center - ray.origin;
-    let adj2 = l.dot(ray.direction);
+    fn intersect(&self, ray: &Ray) -> Option<f64> {
+        let l = self.center - ray.origin;
+        let adj2 = l.dot(ray.direction);
 
-    let d2 = l.dot(l) - adj2.powi(2);
-    let radius2 = self.radius.powi(2);
+        let d2 = l.dot(l) - adj2.powi(2);
+        let radius2 = self.radius.powi(2);
 
-    if d2 > radius2 {
-      return None;
+        if d2 > radius2 {
+            return None;
+        }
+
+        let thc = (radius2 - d2).sqrt();
+        let t0 = adj2 - thc;
+        let t1 = adj2 + thc;
+        if t0 < 0.0 && t1 < 0.0 {
+            return None;
+        }
+
+        let distance = if t0 < t1 { t0 } else { t1 };
+        Some(distance)
     }
 
-    let thc = (radius2 - d2).sqrt();
-    let t0 = adj2 - thc;
-    let t1 = adj2 + thc;
-    if t0 < 0.0 && t1 < 0.0 {
-      return None;
+    fn surface_normal(&self, hit_point: &Point) -> Direction {
+        (*hit_point - self.center).normalize()
     }
 
-    let distance = if t0 < t1 { t0 } else { t1 };
-    Some(distance)
-  }
-
-  fn surface_normal(&self, hit_point: &Point) -> Direction {
-    (*hit_point - self.center).normalize()
-  }
+    fn texture_coord(&self, hit_point: &Point) -> TextureCoords {
+        let hit_vec = *hit_point - self.center;
+        TextureCoords {
+            x: (1.0 + (hit_vec.z.atan2(hit_vec.x) as f32) / PI) * 0.5,
+            y: (hit_vec.y / self.radius).acos() as f32 / PI
+        }
+    }
 }
 
-#[derive(Debug)]
 pub struct Plane {
   pub origin: Point, 
   pub normal: Direction,
-  pub color: Color
+    pub material: Material
 }
 
 impl Intersectable for Plane {
@@ -111,9 +169,32 @@ impl Intersectable for Plane {
   fn surface_normal(&self, _: &Point) -> Direction {
     -self.normal
   }
+
+    fn texture_coord(&self, hit_point: &Point) -> TextureCoords {
+        let mut x_axis = self.normal.cross(Vector3 {
+            x: 0.0,
+            y: 0.0,
+            z: 1.0
+        });
+
+        if x_axis.magnitude() == 0.0 {
+            x_axis = self.normal.cross(Vector3 {
+                x: 0.0,
+                y: 1.0,
+                z: 0.0
+            });
+        }
+
+        let y_axis = self.normal.cross(x_axis.clone());
+        let hit_vec = *hit_point - self.origin;
+
+        TextureCoords {
+            x: hit_vec.dot(x_axis) as f32,
+            y: hit_vec.dot(y_axis) as f32
+        }
+    }
 }
 
-#[derive(Debug)]
 pub struct Scene {
   pub width: u32,
   pub height: u32,
@@ -123,16 +204,17 @@ pub struct Scene {
 }
 
 impl Scene {
-  pub fn trace(&self, ray: &Ray) -> Option<Intersection> {
-    self.objects
-      .iter()
-      .filter_map(|object| object.intersect(ray).map(| distance | {
-        let hit_point = ray.origin + ray.direction * distance;
-        let normal = object.surface_normal(&hit_point);
-        Intersection::new(distance, hit_point, normal, object)
-      }))
-      .min_by(| i1, i2 |  i1.compare_to(&i2).unwrap())
-  }
+    pub fn trace(&self, ray: &Ray) -> Option<Intersection> {
+        self.objects
+            .iter()
+            .filter_map(|object| object.intersect(ray).map(|distance| {
+                let hit_point = ray.origin + ray.direction * distance;
+                let normal = object.surface_normal(&hit_point);
+                let texture_coord = object.texture_coord(&hit_point);
+                Intersection::new(distance, hit_point, texture_coord, normal, object)
+            }))
+            .min_by(|i1, i2| i1.compare_to(&i2).unwrap())
+    }
 }
 
 pub struct SceneBuilder {
