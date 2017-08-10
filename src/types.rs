@@ -2,7 +2,7 @@ use cgmath::Vector3;
 use image::Rgba;
 use std::ops::{Mul, Add};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Color {
     pub red: f32,
     pub green: f32,

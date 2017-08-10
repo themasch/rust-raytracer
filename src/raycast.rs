@@ -1,54 +1,41 @@
-use types::{Direction, Point};
+use types::{Direction, Point, Color};
 use cgmath::prelude::*;
-use objects::{Object, Scene, TextureCoords};
+use objects::TextureCoords;
+use scene::Scene;
 
 use std::cmp::Ordering;
 
-pub struct Intersection<'a> {
+pub struct Intersection {
     distance: f64,
-    direction: Direction,
+    surface_normal: Direction,
     hit_point: Point,
-    tex_coord: TextureCoords,
-    object: &'a Object
+    tex_coord: TextureCoords
 }
 
-impl<'a> Intersection<'a> {
-    pub fn new<'b>(distance: f64, hit_point: Point, tex_coord: TextureCoords, direction: Direction, object: &'b Object) -> Intersection<'b> {
+impl Intersection {
+    pub fn new(distance: f64, hit_point: Point, tex_coord: TextureCoords, surface_normal: Direction) -> Intersection {
         Intersection {
             distance,
             hit_point,
-            direction,
-            tex_coord,
-            object
+            surface_normal,
+            tex_coord
         }
     }
 
-    pub fn compare_to(&self, other: &Intersection) -> Option<Ordering> {
-        self.distance.partial_cmp(&other.distance)
-    }
-
-    pub fn object(&self) -> &Object {
-        self.object
-    }
+    pub fn distance(&self) -> f64 { self.distance }
 
     pub fn hit_point(&self) -> Point {
         self.hit_point
     }
 
-    pub fn direction(&self) -> Direction {
-        self.direction
+    pub fn surface_normal(&self) -> Direction {
+        self.surface_normal
     }
 
-    pub fn texture_coord(&self) -> &TextureCoords { &self.tex_coord }
+    pub fn texture_coord(&self) -> TextureCoords { self.tex_coord.clone() }
 }
 
-pub trait Intersectable {
-    fn intersect(&self, ray: &Ray) -> Option<f64>;
-
-    fn surface_normal(&self, hit_point: &Point) -> Direction;
-    fn texture_coord(&self, hit_point: &Point) -> TextureCoords;
-}
-
+#[derive(Debug)]
 pub struct Ray {
     pub origin: Point,
     pub direction: Direction
@@ -71,11 +58,121 @@ impl Ray {
         }
     }
 
-    pub fn create_reflection(ray_direction: &Direction, int: &Intersection) -> Ray {
+    pub fn create_reflection(ray_direction: &Direction, int: &IntersectionResult) -> Ray {
         Ray {
-            origin: int.hit_point() + (int.direction * 1e-13),
-            direction: ray_direction - (2.0 * ray_direction.dot(int.direction) * int.direction)
+            origin: int.reflection_origin(),
+            direction: ray_direction - (2.0 * ray_direction.dot(int.surface_normal()) * int.surface_normal())
+        }
+    }
+
+    pub fn create_shadow_ray(direction_to_light: Direction, int: &IntersectionResult) -> Ray {
+        Ray {
+            origin: int.hit_point + direction_to_light * int.distance * 1e-13,
+            direction: direction_to_light
         }
     }
 }
 
+#[derive(Debug)]
+pub struct IntersectionResult {
+    distance: f64,
+    hit_point: Point,
+    surface_normal: Direction,
+    surface: SurfaceProperties
+}
+
+impl PartialEq for IntersectionResult {
+    fn eq(&self, other: &Self) -> bool {
+        self.distance.eq(&other.distance)
+    }
+
+    fn ne(&self, other: &Self) -> bool {
+        self.distance.ne(&other.distance)
+    }
+}
+
+impl PartialOrd for IntersectionResult {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.distance.partial_cmp(&other.distance)
+    }
+
+    fn lt(&self, other: &Self) -> bool {
+        self.distance.lt(&other.distance)
+    }
+
+    fn le(&self, other: &Self) -> bool {
+        self.distance.le(&other.distance)
+    }
+
+    fn gt(&self, other: &Self) -> bool {
+        self.distance.gt(&other.distance)
+    }
+
+    fn ge(&self, other: &Self) -> bool {
+        self.distance.ge(&other.distance)
+    }
+}
+
+impl Eq for IntersectionResult {}
+
+impl Ord for IntersectionResult {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.distance.partial_cmp(&other.distance) {
+            Some(ord) => ord,
+            None => Ordering::Equal
+        }
+    }
+}
+
+impl IntersectionResult {
+    pub fn create(intersection: &Intersection, color: Color, albedo: f32, reflectivity: Option<f32>) -> IntersectionResult {
+        IntersectionResult {
+            distance: intersection.distance(),
+            surface_normal: intersection.surface_normal(),
+            hit_point: intersection.hit_point(),
+            surface: SurfaceProperties {
+                reflectivity: reflectivity,
+                albedo: albedo,
+                color: color
+            }
+        }
+    }
+
+    pub fn distance(&self) -> f64 {
+        self.distance
+    }
+
+    pub fn reflection_origin(&self) -> Point {
+        self.hit_point + self.surface_normal * 1e-13
+    }
+
+    pub fn surface_normal(&self) -> Direction {
+        self.surface_normal
+    }
+
+    pub fn albedo(&self) -> f32 {
+        self.surface.albedo
+    }
+
+    pub fn color(&self) -> Color {
+        self.surface.color
+    }
+
+    pub fn reflectivity(&self) -> Option<f32> {
+        match self.surface.reflectivity {
+            Some(r) => if r < 1e-10 {
+                None
+            } else {
+                Some(r)
+            },
+            None => None
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct SurfaceProperties {
+    pub albedo: f32,
+    pub color: Color,
+    pub reflectivity: Option<f32>
+}

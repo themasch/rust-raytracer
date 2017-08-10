@@ -1,8 +1,6 @@
 
 use std::sync::Arc;
 use std::sync::mpsc::channel;
-use std::time::{Duration, Instant};
-use std::thread;
 use std::f32::consts::PI;
 use std::cmp::min;
 
@@ -10,45 +8,39 @@ use cgmath::prelude::*;
 use threadpool::ThreadPool;
 use num_cpus;
 
-use objects::{Scene, SurfaceType};
-use raycast::{Ray,Intersection};
+use scene::Scene;
+use raycast::{Ray, IntersectionResult};
 use image::{DynamicImage, GenericImage};
 use types::Color;
 
-fn format_time(duration: &Duration) -> f64 {
-    duration.as_secs() as f64 + duration.subsec_nanos() as f64 * 1e-9
-}
 
-
-fn shade_diffuse(scene: &Scene, intersection: &Intersection) -> Color {
+fn shade_diffuse(scene: &Scene, intersection: &IntersectionResult) -> Color {
     let mut color = Color::from_rgb(0.0, 0.0, 0.0);
 
     for light in &scene.lights {
         let direction_to_light = -light.direction().normalize();
-        let shadow_ray = Ray {
-            origin: intersection.hit_point() + intersection.direction() * 1e-13,
-            direction: direction_to_light
-        };
+        let shadow_ray = Ray::create_shadow_ray(direction_to_light, intersection);
 
-        let in_light = scene.trace(&shadow_ray).is_none();
+        let shadow_trace = scene.trace(&shadow_ray);
+        let in_light = shadow_trace.is_none();
 
         let light_intensity = if in_light { light.intensity() } else { 0.0 };
-        let light_power = (intersection.direction().dot(direction_to_light) as f32).max(0.0) * light_intensity;
-        let light_reflected = intersection.object().material().albedo / PI;
+        let light_power = (intersection.surface_normal().dot(direction_to_light) as f32).max(0.0) * light_intensity;
 
+        let light_reflected = intersection.albedo() / PI;
 
-        color = color + (intersection.object().color(&intersection.texture_coord()).clone() * light.color().clone() * light_power * light_reflected);
+        color = color + (intersection.color() * light.color().clone() * light_power * light_reflected);
     }
 
     color
 }
 
-fn get_color(scene: &Scene, ray: &Ray, intersection: &Intersection, depth: u32) -> Color {
+fn get_color(scene: &Scene, ray: &Ray, intersection: &IntersectionResult, depth: u32) -> Color {
     let mut color = shade_diffuse(scene, intersection);
-    if let SurfaceType::Reflective { reflectivity } = intersection.object().material().surface {
+    if let Some(relf) = intersection.reflectivity() {
         let reflection_ray = Ray::create_reflection(&ray.direction, intersection);
-        let reflection_color = cast_ray(scene, &reflection_ray, depth + 1) * reflectivity;
-        color = color * (1.0 * reflectivity) + reflection_color
+        let reflection_color = cast_ray(scene, &reflection_ray, depth + 1) * relf;
+        color = color * (1.0 * relf) + reflection_color
     }
 
     color

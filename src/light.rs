@@ -1,6 +1,6 @@
 use types::{Direction, Color};
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Light {
   Directional(DirectionalLight)
 }
@@ -25,7 +25,7 @@ impl Light {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct DirectionalLight {
     pub direction: Direction,
     pub color: Color,
