@@ -1,4 +1,4 @@
-use cgmath::Vector3;
+use cgmath::{Vector3, Point3};
 use image::Rgba;
 use std::ops::{Mul, Add};
 
@@ -78,6 +78,6 @@ impl Add for Color {
     }
 }
 
-pub type Point = Vector3<f64>;
+pub type Point = Point3<f64>;
 
 pub type Direction = Vector3<f64>;

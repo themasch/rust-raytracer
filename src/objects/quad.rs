@@ -1,4 +1,5 @@
 use objects::WorldPosition;
+use cgmath::prelude::*;
 use types::Point;
 use raycast::{Ray, Intersection};
 
@@ -9,7 +10,7 @@ pub struct Quad {
 impl Quad {
     pub fn intersects(&self, ray: &Ray, position: &WorldPosition) -> bool {
         let pmin = position.position;
-        let pmax = position.position + self.size;
+        let pmax = position.position + self.size.to_vec();
 
         let tmin = (pmin.x - ray.origin.x) / ray.direction.x;
         let tmax = (pmax.x - ray.origin.x) / ray.direction.x;

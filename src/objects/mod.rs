@@ -165,10 +165,15 @@ impl<E: Structure + Send + Sync> ObjectBuilder<E> {
                 surface: SurfaceType::Diffuse,
                 albedo: 0.1
             },
-            position: Point::zero(),
-            rotation: Quaternion::zero(),
+            position: Point::new(0.0, 0.0, 0.0),
+            rotation: Quaternion::new(0.0, 0.0, 0.0, 0.0).normalize(),
             structure: Box::new(object)
         }
+    }
+
+    pub fn rotation(mut self, rotation: Quaternion<f64>) -> ObjectBuilder<E> {
+        self.rotation = rotation.normalize();
+        self
     }
 
     pub fn at_position(mut self, position: Point) -> ObjectBuilder<E> {

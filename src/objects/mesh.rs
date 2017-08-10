@@ -8,32 +8,70 @@ use wavefront_obj::obj;
 struct Triangle {
     p1: Point,
     p2: Point,
-    p3: Point
+    p3: Point,
+    normals: Option<(Direction, Direction, Direction)>
 }
 
 
 impl Triangle {
-    pub fn from_obj_vertices(origin: &Point, v1: &obj::Vertex, v2: &obj::Vertex, v3: &obj::Vertex) -> Triangle {
+    pub fn from_obj_vertices(position: &WorldPosition, v1: &obj::Vertex, v2: &obj::Vertex, v3: &obj::Vertex) -> Triangle {
+        let rot = position.rotation;
+        let origin = position.position;
+
         Triangle {
-            p1: Point { x: origin.x - v1.x, y: origin.y - v1.y, z: origin.z - v1.z },
-            p2: Point { x: origin.x - v2.x, y: origin.y - v2.y, z: origin.z - v2.z },
-            p3: Point { x: origin.x - v3.x, y: origin.y - v3.y, z: origin.z - v3.z },
+            p1: rot.rotate_point(Point { x: v1.x, y: v1.y, z: v1.z }) + origin.to_vec(),
+            p2: rot.rotate_point(Point { x: v2.x, y: v2.y, z: v2.z }) + origin.to_vec(),
+            p3: rot.rotate_point(Point { x: v3.x, y: v3.y, z: v3.z }) + origin.to_vec(),
+            normals: None
         }
     }
 
-    pub fn surface_normal(&self) -> Direction {
-        let vec_a = self.p2 - self.p1;
-        let vec_b = self.p3 - self.p1;
+    pub fn surface_normal(&self, u: f64, v: f64) -> Direction {
+        if let Some((n1, n2, n3)) = self.normals {
+            (n1 * u + n2 * v + n3 * (1.0 - u - v)).normalize()
+        } else {
+            let vec_a = self.p2 - self.p1;
+            let vec_b = self.p3 - self.p1;
 
-        vec_a.cross(vec_b)
+            vec_a.cross(vec_b).normalize()
+        }
     }
 
     /// implements https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
     pub fn intersects(&self, ray: &Ray) -> Option<(Direction, TextureCoords, f64)> {
         let vec_a = self.p2 - self.p1;
         let vec_b = self.p3 - self.p1;
-        let normal = self.surface_normal();
+        let normal = vec_a.cross(vec_b); //self.surface_normal();
+        let area2 = normal.magnitude();
 
+        let n_dot_dir = normal.dot(ray.direction);
+        if n_dot_dir.abs() < 1e-10 {
+            return None;
+        }
+
+        let d = normal.dot(self.p1.to_vec());
+        let t = (normal.dot(ray.origin.to_vec()) + d) / n_dot_dir;
+
+        if t < 0.0 { return None; }
+
+        let p = ray.origin + t * ray.direction;
+
+        if normal.dot(vec_a.cross(p - self.p1)) < 0.0 {
+            return None;
+        }
+
+        let c = (self.p3 - self.p2).cross(p - self.p2);
+        let u = c.magnitude() / area2;
+        if normal.dot(c) < 0.0 { return None; }
+
+        let c = (self.p1 - self.p3).cross(p - self.p3);
+        let v = c.magnitude() / area2;
+        if normal.dot(c) < 0.0 { return None; }
+
+        let normal = self.surface_normal(u, v);
+
+        return Some((normal, TextureCoords { x: 0.0, y: 0.0 }, t));
+        /*/////
         let pvec = ray.direction.cross(vec_b);
         let det = (vec_a).dot(pvec);
 
@@ -58,13 +96,22 @@ impl Triangle {
             return None;
         }
 
-        Some((-normal.normalize(), TextureCoords { x: 0.0, y: 0.0 }, vec_b.dot(qvec) * inv_det))
+        Some((-normal, TextureCoords { x: 0.0, y: 0.0 }, vec_b.dot(qvec) * inv_det))*/
+    }
+
+    fn with_normals(mut self, position: &WorldPosition, n1: &obj::Normal, n2: &obj::Normal, n3: &obj::Normal) -> Triangle {
+        self.normals = Some((
+            position.rotation.rotate_vector(Direction { x: n1.x, y: n1.y, z: n1.z }),
+            position.rotation.rotate_vector(Direction { x: n2.x, y: n2.y, z: n2.z }),
+            position.rotation.rotate_vector(Direction { x: n3.x, y: n3.y, z: n3.z }),
+        ));
+        self
     }
 }
 
 pub struct Mesh {
     pub mesh: obj::Object,
-    pub bb: (Point, Point)
+    pub bb: (Point, Sphere)
 }
 
 impl Structure for Mesh {
@@ -85,7 +132,7 @@ impl Structure for Mesh {
 impl Mesh {
     fn intersect(&self, ray: &Ray, position: &WorldPosition) -> Option<(Direction, TextureCoords, f64)> {
         if !self.check_bb(ray, position) {
-            //            return None;
+            return None;
         }
 
         self.mesh.geometry.iter().filter_map(|geom| {
@@ -96,7 +143,15 @@ impl Mesh {
                         let v2 = self.mesh.vertices[vidx2.0];
                         let v3 = self.mesh.vertices[vidx3.0];
 
-                        let triangle = Triangle::from_obj_vertices(&position.position, &v1, &v2, &v3);
+                        let triangle = if vidx1.2.is_some() && vidx2.2.is_some() && vidx3.2.is_some() {
+                            let n1 = self.mesh.normals[vidx1.2.unwrap()];
+                            let n2 = self.mesh.normals[vidx2.2.unwrap()];
+                            let n3 = self.mesh.normals[vidx3.2.unwrap()];
+                            Triangle::from_obj_vertices(&position, &v1, &v2, &v3).with_normals(&position, &n1, &n2, &n3)
+                        } else {
+                            Triangle::from_obj_vertices(&position, &v1, &v2, &v3)
+                        };
+
                         triangle.intersects(ray)
                     }
                     _ => None
@@ -105,7 +160,7 @@ impl Mesh {
         }).min_by(|f1, f2| f1.2.partial_cmp(&f2.2).unwrap())
     }
 
-    fn create_bounding_box(obj: &obj::Object) -> (Point, Point) {
+    fn create_bounding_box(obj: &obj::Object) -> (Point, Sphere) {
         let first_vert = obj.vertices.get(0).unwrap();
         let min = (first_vert.x, first_vert.y, first_vert.z);
         let max = (first_vert.x, first_vert.y, first_vert.z);
@@ -130,59 +185,20 @@ impl Mesh {
             Point { x: max.0, y: max.1, z: max.2 }
         ));
 
-        (
-            Point { x: min.0, y: min.1, z: min.2 },
-            Point { x: max.0, y: max.1, z: max.2 }
-        )
+        let a = Point { x: min.0, y: min.1, z: min.2 };
+        let b = Point { x: max.0, y: max.1, z: max.2 };
+
+        let center = Point::midpoint(a, b);
+
+        let distance = center.distance(a);
+
+        return (center, Sphere::create(distance))
     }
 
     fn check_bb(&self, ray: &Ray, position: &WorldPosition) -> bool {
-        let pmin = position.position + self.bb.0;
-        let pmax = position.position + self.bb.1;
+        let center = self.bb.0 + position.position.to_vec();
 
-        let tmin = (pmin.x - ray.origin.x) / ray.direction.x;
-        let tmax = (pmax.x - ray.origin.x) / ray.direction.x;
-
-        if tmin > tmax {
-            let (tmin, tmax) = (tmax, tmin);
-        }
-
-        let tymin = (pmin.y - ray.origin.y) / ray.direction.y;
-        let tymax = (pmax.y - ray.origin.y) / ray.direction.y;
-
-        if tymin > tymax {
-            let (tymin, tymax) = (tymax, tymin);
-        }
-
-        if tmin > tymax || tymin > tmax {
-            return false;
-        }
-
-        if tymin > tmin {
-            let tmin = tymin;
-        }
-
-        if tymax > tmax {
-            let tmax = tymax;
-        }
-
-        let tzmin = (pmin.z - ray.origin.z) / ray.direction.z;
-        let tzmax = (pmax.z - ray.origin.z) / ray.direction.z;
-
-        if tzmin > tzmax {
-            let (tzmin, tzmax) = (tzmax, tzmin);
-        }
-
-        if tmin > tzmax || tzmin > tmax {
-            return false;
-        }
-
-        /*
-                if ray.origin.eq(&Point::zero()) {
-                    println!("{:?} . {:?} . {:?}", ray.direction, pmin, pmax);
-                }
-        */
-        true
+        self.bb.1.get_intersection(ray, &WorldPosition { position: center, rotation: position.rotation }).is_some()
     }
 
     pub fn create(obj: obj::Object) -> Mesh {

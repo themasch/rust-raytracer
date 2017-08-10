@@ -40,7 +40,7 @@ fn get_color(scene: &Scene, ray: &Ray, intersection: &IntersectionResult, depth:
     if let Some(relf) = intersection.reflectivity() {
         let reflection_ray = Ray::create_reflection(&ray.direction, intersection);
         let reflection_color = cast_ray(scene, &reflection_ray, depth + 1) * relf;
-        color = color * (1.0 * relf) + reflection_color
+        color = color * (1.0 - relf) + reflection_color
     }
 
     color
@@ -96,7 +96,12 @@ pub fn render(scene: Scene) -> DynamicImage {
         });
     }
 
+    let mut counter = 0;
     rx.iter()
+        .inspect(|_| {
+            counter = counter + 1;
+            println!("{:?} of {:?} done", counter, jobs);
+        })
         .take(jobs as usize)
         .fold(
             DynamicImage::new_rgb8(sw, sh),

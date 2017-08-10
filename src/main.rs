@@ -20,6 +20,7 @@ use cgmath::prelude::*;
 use objects::{ObjectBuilder, Sphere, Plane, Mesh, Material};
 use scene::SceneBuilder;
 use types::{Color,Point,Direction};
+use cgmath::Quaternion;
 use light::*;
 use render::render;
 
@@ -28,7 +29,7 @@ fn format_time(duration: &Duration) -> f64 {
 }
 
 fn main() {
-    let teapot_read = wavefront_obj::obj::parse(String::from(include_str!("../cube.obj")));
+    let teapot_read = wavefront_obj::obj::parse(String::from(include_str!("../key-obj.obj")));
     if let Err(err) = teapot_read {
         panic!("{:?}", err);
     }
@@ -36,44 +37,56 @@ fn main() {
     let teapot = teapot_read.unwrap();
     let pot = teapot.objects.get(0);
 
-    let scene = SceneBuilder::new(640, 640)
-        /*.add_object(
+    let scene = SceneBuilder::new(256, 256)
+        .add_object(
             ObjectBuilder::create_for(Sphere::create(1.0))
-                .at_position(Point { z: -5.0, ..Point::zero() })
+                .at_position(Point::new(3.0, 0.0, -5.0))
+                .with_material(Material::reflective_color(
+                    Color::from_rgb(0.2, 0.3, 0.8),
+                    0.2,
+                    0.3
+                ))
                 .into()
         )
         .add_object(
-            ObjectBuilder::create_for(Sphere::create(1.0))
-                .with_material(Material::diffuse_color(Color::from_rgb(1.0, 0.0, 0.0), 0.1))
-                .at_position(Point { z: -6.0, y: -1.0, x: -2.0 })
+            ObjectBuilder::create_for(Sphere::create(0.3))
+                .at_position(Point::new(-3.5, 0.0, -4.0))
+                .with_material(Material::reflective_color(
+                    Color::from_rgb(0.2, 0.3, 0.8),
+                    0.2,
+                    0.3
+                ))
                 .into()
-        )*/
+        )
         .add_object(
             ObjectBuilder::create_for(Plane::create(Direction::new(0.0, 0.0, -1.0)))
                 .at_position(Point::new(0.0, 0.0, -20.0))
-                .with_material(Material::diffuse_color(
-                    Color::from_rgb(0.2, 0.3, 0.8),
+                .with_material(Material::reflective_color(
+                    Color::from_rgb(0.2, 0.3, 0.4),
                     0.2,
+                    0.1
                 ))
                 .into()
         )
         .add_object(
             ObjectBuilder::create_for(Plane::create(Direction::new(0.0, -1.0, -0.5).normalize()))
                 .at_position(Point::new(0.0, -2.0, -20.0))
-                .with_material(Material::diffuse_color(
-                    Color::from_rgb(0.8, 0.3, 0.0),
-                    0.2,
+                .with_material(Material::reflective_color(
+                    Color::from_rgb(0.4, 0.1, 0.0),
+                    0.1,
+                    0.1
                 ))
                 .into()
         )
         .add_object(
             ObjectBuilder::create_for(Mesh::create(pot.unwrap().clone()))
-                .with_material(Material::diffuse_color(
-                    Color::from_rgb(0.2, 0.2, 0.2),
-                    0.2
+                .with_material(Material::reflective_color(
+                    Color::from_rgb(0.0, 0.4, 0.4),
+                    0.1,
+                    0.1
                 ))
-                //.rotate_y(90.0)
-                .at_position(Point::new(0.0, 0.0, -5.0))
+                .rotation(Quaternion::new(0.0, 0.25, 0.5, 0.0))
+                .at_position(Point::new(0.0, 0.0, -0.1))
                 .into()
         )
         /*.add_object(&Plane {
@@ -85,16 +98,16 @@ fn main() {
             origin: Point::new(0.0, -2.0, -5.0),
             normal: Direction::new(0.0, -1.0, 0.0).normalize(),
             material: Material::reflective_color(Color::from_rgb(0.1, 0.3, 0.6), 0.3, 0.1)
-        })
+        })*/
         .add_light(Light::Directional(DirectionalLight {
             direction: Direction::new(0.0, -0.5, -1.0),
             color: Color::from_rgb(1.0, 1.0, 1.0),
             intensity: 20.0
-        }))*/
+        }))
         .add_light(Light::Directional(DirectionalLight {
-            direction: Direction::new(0.0, 0.0, -1.0),
+            direction: Direction::new(0.0, -1.0, -1.0),
             color: Color::from_rgb(1.0, 1.0, 1.0),
-            intensity: 30.0
+            intensity: 10.0
         }))
         .finish();
 

@@ -49,7 +49,7 @@ impl Ray {
         let sensor_y = (1.0 - ((y as f64 + 0.5) / scene.height as f64) * 2.0) * fov_adjustment;
 
         Ray {
-            origin: Point::zero(),
+            origin: Point::new(0.0, 0.0, 0.0),
             direction: Direction {
                 x: sensor_x,
                 y: sensor_y,
