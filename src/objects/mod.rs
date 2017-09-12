@@ -1,5 +1,5 @@
 use raycast::{Intersection, IntersectionResult, Ray};
-use types::{Color, Point};
+use types::{Color, Point, Scale};
 use cgmath::prelude::*;
 use cgmath::Quaternion;
 use image::{DynamicImage, GenericImage};
@@ -96,7 +96,7 @@ impl Material {
 }
 
 pub trait Structure {
-    fn get_intersection(&self, ray: &Ray, position: &WorldPosition) -> Option<Intersection>;
+    fn get_intersection(&self, ray: &Ray, position: &WorldPosition, scale: &Scale) -> Option<Intersection>;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -108,12 +108,13 @@ pub struct WorldPosition {
 pub struct Object {
     material: Material,
     position: WorldPosition,
-    structure: Box<Structure + Send + Sync>
+    structure: Box<Structure + Send + Sync>,
+    scale: Scale
 }
 
 impl Object {
     pub fn intersect(&self, ray: &Ray) -> Option<IntersectionResult> {
-        self.structure.get_intersection(ray, &self.position)
+        self.structure.get_intersection(ray, &self.position, &self.scale)
             .map(|intersection| {
                 IntersectionResult::create(
                     &intersection,
@@ -144,7 +145,8 @@ impl<E: Structure + Send + Sync> From<ObjectBuilder<E>> for Object where E: 'sta
             position: WorldPosition {
                 position: builder.position,
                 rotation: builder.rotation
-            }
+            },
+            scale: builder.scale
         }
     }
 }
@@ -153,7 +155,8 @@ pub struct ObjectBuilder<E: Structure + Send + Sync> {
     material: Material,
     structure: Box<E>,
     position: Point,
-    rotation: Quaternion<f64>
+    rotation: Quaternion<f64>,
+    scale: Scale
 }
 
 
@@ -167,8 +170,14 @@ impl<E: Structure + Send + Sync> ObjectBuilder<E> {
             },
             position: Point::new(0.0, 0.0, 0.0),
             rotation: Quaternion::new(0.0, 0.0, 0.0, 0.0).normalize(),
-            structure: Box::new(object)
+            structure: Box::new(object),
+            scale: 1.0
         }
+    }
+
+    pub fn scale(mut self, scale: Scale) -> ObjectBuilder<E> {
+        self.scale = scale;
+        self
     }
 
     pub fn rotation(mut self, rotation: Quaternion<f64>) -> ObjectBuilder<E> {

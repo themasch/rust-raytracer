@@ -1,5 +1,5 @@
 use objects::{Material, TextureCoords, SurfaceType, Sphere, Structure, WorldPosition, Quad};
-use types::{Point, Color, Direction};
+use types::{Point, Color, Direction, Scale};
 use raycast::{Ray, Intersection};
 use cgmath::prelude::*;
 use cgmath::Vector3;
@@ -14,14 +14,14 @@ struct Triangle {
 
 
 impl Triangle {
-    pub fn from_obj_vertices(position: &WorldPosition, v1: &obj::Vertex, v2: &obj::Vertex, v3: &obj::Vertex) -> Triangle {
+    pub fn from_obj_vertices(position: &WorldPosition, scale: &Scale, v1: &obj::Vertex, v2: &obj::Vertex, v3: &obj::Vertex) -> Triangle {
         let rot = position.rotation;
         let origin = position.position;
 
         Triangle {
-            p1: rot.rotate_point(Point { x: v1.x, y: v1.y, z: v1.z }) + origin.to_vec(),
-            p2: rot.rotate_point(Point { x: v2.x, y: v2.y, z: v2.z }) + origin.to_vec(),
-            p3: rot.rotate_point(Point { x: v3.x, y: v3.y, z: v3.z }) + origin.to_vec(),
+            p1: rot.rotate_point(Point { x: v1.x, y: v1.y, z: v1.z }) * *scale + origin.to_vec(),
+            p2: rot.rotate_point(Point { x: v2.x, y: v2.y, z: v2.z }) * *scale + origin.to_vec(),
+            p3: rot.rotate_point(Point { x: v3.x, y: v3.y, z: v3.z }) * *scale + origin.to_vec(),
             normals: None
         }
     }
@@ -37,11 +37,10 @@ impl Triangle {
         }
     }
 
-    /// implements https://en.wikipedia.org/wiki/M%C3%B6ller%E2%80%93Trumbore_intersection_algorithm
     pub fn intersects(&self, ray: &Ray) -> Option<(Direction, TextureCoords, f64)> {
         let vec_a = self.p2 - self.p1;
         let vec_b = self.p3 - self.p1;
-        let normal = vec_a.cross(vec_b); //self.surface_normal();
+        let normal = vec_a.cross(vec_b);
         let area2 = normal.magnitude();
 
         let n_dot_dir = normal.dot(ray.direction);
@@ -70,33 +69,7 @@ impl Triangle {
 
         let normal = self.surface_normal(u, v);
 
-        return Some((normal, TextureCoords { x: 0.0, y: 0.0 }, t));
-        /*/////
-        let pvec = ray.direction.cross(vec_b);
-        let det = (vec_a).dot(pvec);
-
-        // parallel
-        if det.abs() < 1e-8 {
-            //println!("PARALLEL: {:?} | {:?} | {:?}", vec_a, vec_b, det);
-            return None;
-        }
-
-        let inv_det = 1.0 / det;
-        let tvec = ray.origin - self.p1;
-        let u = tvec.dot(pvec) * inv_det;
-        if u < 0.0 || u > 1.0 {
-            //println!("U       : {:?} | {:?}", u, tvec);
-            return None;
-        }
-
-        let qvec = tvec.cross(vec_a);
-        let v = ray.direction.dot(qvec) * inv_det;
-        if v < 0.0 || u + v > 1.0 {
-            //println!("V       : {:?} | {:?}", u, v);
-            return None;
-        }
-
-        Some((-normal, TextureCoords { x: 0.0, y: 0.0 }, vec_b.dot(qvec) * inv_det))*/
+        Some((normal, TextureCoords { x: 0.0, y: 0.0 }, t))
     }
 
     fn with_normals(mut self, position: &WorldPosition, n1: &obj::Normal, n2: &obj::Normal, n3: &obj::Normal) -> Triangle {
@@ -115,8 +88,8 @@ pub struct Mesh {
 }
 
 impl Structure for Mesh {
-    fn get_intersection(&self, ray: &Ray, position: &WorldPosition) -> Option<Intersection> {
-        self.intersect(ray, position).map(|result| {
+    fn get_intersection(&self, ray: &Ray, position: &WorldPosition, scale: &Scale) -> Option<Intersection> {
+        self.intersect(ray, position, scale).map(|result| {
             let (normal, texc, distance) = result;
             let hit_point = ray.origin + ray.direction * distance;
             Intersection::new(
@@ -130,8 +103,8 @@ impl Structure for Mesh {
 }
 
 impl Mesh {
-    fn intersect(&self, ray: &Ray, position: &WorldPosition) -> Option<(Direction, TextureCoords, f64)> {
-        if !self.check_bb(ray, position) {
+    fn intersect(&self, ray: &Ray, position: &WorldPosition, scale: &Scale) -> Option<(Direction, TextureCoords, f64)> {
+        if !self.check_bb(ray, position, scale) {
             return None;
         }
 
@@ -147,9 +120,9 @@ impl Mesh {
                             let n1 = self.mesh.normals[vidx1.2.unwrap()];
                             let n2 = self.mesh.normals[vidx2.2.unwrap()];
                             let n3 = self.mesh.normals[vidx3.2.unwrap()];
-                            Triangle::from_obj_vertices(&position, &v1, &v2, &v3).with_normals(&position, &n1, &n2, &n3)
+                            Triangle::from_obj_vertices(&position, scale, &v1, &v2, &v3).with_normals(&position, &n1, &n2, &n3)
                         } else {
-                            Triangle::from_obj_vertices(&position, &v1, &v2, &v3)
+                            Triangle::from_obj_vertices(&position, scale, &v1, &v2, &v3)
                         };
 
                         triangle.intersects(ray)
@@ -195,10 +168,10 @@ impl Mesh {
         return (center, Sphere::create(distance))
     }
 
-    fn check_bb(&self, ray: &Ray, position: &WorldPosition) -> bool {
+    fn check_bb(&self, ray: &Ray, position: &WorldPosition, scale: &Scale) -> bool {
         let center = self.bb.0 + position.position.to_vec();
 
-        self.bb.1.get_intersection(ray, &WorldPosition { position: center, rotation: position.rotation }).is_some()
+        self.bb.1.get_intersection(ray, &WorldPosition { position: center, rotation: position.rotation }, scale).is_some()
     }
 
     pub fn create(obj: obj::Object) -> Mesh {

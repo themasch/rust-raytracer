@@ -29,7 +29,7 @@ fn format_time(duration: &Duration) -> f64 {
 }
 
 fn main() {
-    let teapot_read = wavefront_obj::obj::parse(String::from(include_str!("../key-obj.obj")));
+    let teapot_read = wavefront_obj::obj::parse(String::from(include_str!("../teapot.obj")));
     if let Err(err) = teapot_read {
         panic!("{:?}", err);
     }
@@ -37,56 +37,67 @@ fn main() {
     let teapot = teapot_read.unwrap();
     let pot = teapot.objects.get(0);
 
-    let scene = SceneBuilder::new(256, 256)
-        .add_object(
+    let scene = SceneBuilder::new(512, 512)
+        /*.add_object(
             ObjectBuilder::create_for(Sphere::create(1.0))
-                .at_position(Point::new(3.0, 0.0, -5.0))
+                .at_position(Point::new(0.0, 0.0, -5.0))
                 .with_material(Material::reflective_color(
-                    Color::from_rgb(0.2, 0.3, 0.8),
-                    0.2,
-                    0.3
+                    Color::from_rgb(0.2, 1.0, 0.2),
+                    0.18,
+                    0.7
                 ))
                 .into()
         )
         .add_object(
-            ObjectBuilder::create_for(Sphere::create(0.3))
-                .at_position(Point::new(-3.5, 0.0, -4.0))
+            ObjectBuilder::create_for(Sphere::create(2.0))
+                .at_position(Point::new(-3.0, 1.0, -6.0))
                 .with_material(Material::reflective_color(
                     Color::from_rgb(0.2, 0.3, 0.8),
-                    0.2,
-                    0.3
+                    0.58,
+                    0.0
                 ))
                 .into()
         )
         .add_object(
-            ObjectBuilder::create_for(Plane::create(Direction::new(0.0, 0.0, -1.0)))
-                .at_position(Point::new(0.0, 0.0, -20.0))
+            ObjectBuilder::create_for(Sphere::create(1.5))
+                .at_position(Point::new(2.0, 1.0, -4.0))
+                .with_material(Material::reflective_color(
+                    Color::from_rgb(1.0, 1.0, 1.0),
+                    0.18,
+                    0.6
+                ))
+                .into()
+        )*/
+        .add_object(
+            ObjectBuilder::create_for(Plane::create(Direction::new(0.0, -1.0, 0.0)))
+                .at_position(Point::new(0.0, -2.0, -5.0))
                 .with_material(Material::reflective_color(
                     Color::from_rgb(0.2, 0.3, 0.4),
-                    0.2,
-                    0.1
+                    0.18,
+                    0.5
                 ))
                 .into()
         )
         .add_object(
-            ObjectBuilder::create_for(Plane::create(Direction::new(0.0, -1.0, -0.5).normalize()))
-                .at_position(Point::new(0.0, -2.0, -20.0))
+            ObjectBuilder::create_for(Plane::create(Direction::new(0.0, 0.0, -1.0).normalize()))
+                .at_position(Point::new(0.0, 0.0, -20.0))
                 .with_material(Material::reflective_color(
-                    Color::from_rgb(0.4, 0.1, 0.0),
-                    0.1,
-                    0.1
+                    Color::from_rgb(0.2, 0.3, 1.0),
+                    0.38,
+                    0.0
                 ))
                 .into()
         )
         .add_object(
             ObjectBuilder::create_for(Mesh::create(pot.unwrap().clone()))
                 .with_material(Material::reflective_color(
-                    Color::from_rgb(0.0, 0.4, 0.4),
+                    Color::from_rgb(0.6, 0.6, 0.6),
                     0.1,
                     0.1
                 ))
-                .rotation(Quaternion::new(0.0, 0.25, 0.5, 0.0))
-                .at_position(Point::new(0.0, 0.0, -0.1))
+                .scale(1.0)
+                .rotation(Quaternion::new(0.0, 0.0, 1.0, 0.0))
+                .at_position(Point::new(0.0, 0.0, -8.0))
                 .into()
         )
         /*.add_object(&Plane {

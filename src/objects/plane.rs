@@ -1,5 +1,5 @@
 use objects::{Material, TextureCoords, SurfaceType, Structure, WorldPosition};
-use types::{Point, Color, Direction};
+use types::{Point, Color, Direction, Scale};
 use raycast::{Ray, Intersection};
 use cgmath::prelude::*;
 use cgmath::Vector3;
@@ -52,7 +52,7 @@ impl Plane {
 }
 
 impl Structure for Plane {
-    fn get_intersection(&self, ray: &Ray, position: &WorldPosition) -> Option<Intersection> {
+    fn get_intersection(&self, ray: &Ray, position: &WorldPosition, _: &Scale) -> Option<Intersection> {
         self.intersect(ray, position).map(|distance| {
             let hit_point = ray.origin + ray.direction * distance;
             Intersection::new(

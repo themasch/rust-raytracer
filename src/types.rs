@@ -80,4 +80,5 @@ impl Add for Color {
 
 pub type Point = Point3<f64>;
 
+pub type Scale = f64;
 pub type Direction = Vector3<f64>;
