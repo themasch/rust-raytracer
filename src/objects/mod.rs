@@ -1,36 +1,35 @@
-use raycast::{Intersection, IntersectionResult, Ray};
-use types::{Color, Point, Scale};
 use cgmath::prelude::*;
 use cgmath::Quaternion;
 use image::{DynamicImage, GenericImage};
+use raycast::{Intersection, IntersectionResult, Ray};
+use types::{Color, Point, Scale};
 
-pub mod sphere;
-pub mod quad;
-pub mod plane;
 pub mod mesh;
+pub mod plane;
+pub mod quad;
+pub mod sphere;
 
-pub use self::sphere::*;
-pub use self::quad::*;
-pub use self::plane::*;
 pub use self::mesh::*;
-
+pub use self::plane::*;
+pub use self::quad::*;
+pub use self::sphere::*;
 
 #[derive(Clone)]
 pub struct TextureCoords {
     pub x: f32,
-    pub y: f32
+    pub y: f32,
 }
 
 #[derive(Clone, Debug)]
 pub enum SurfaceType {
     Diffuse,
-    Reflective { reflectivity: f32 }
+    Reflective { reflectivity: f32 },
 }
 
 #[derive(Clone)]
 pub enum Coloration {
     Color(Color),
-    Texture(DynamicImage)
+    Texture(DynamicImage),
 }
 
 fn wrap(val: f32, bound: u32) -> u32 {
@@ -62,19 +61,23 @@ impl Coloration {
 pub struct Material {
     pub color: Coloration,
     pub albedo: f32,
-    pub surface: SurfaceType
+    pub surface: SurfaceType,
 }
 
 impl Material {
     pub fn new(color: Coloration, albedo: f32) -> Material {
-        Material { color, albedo, surface: SurfaceType::Diffuse }
+        Material {
+            color,
+            albedo,
+            surface: SurfaceType::Diffuse,
+        }
     }
 
     pub fn diffuse_color(color: Color, albedo: f32) -> Material {
         Material {
             color: Coloration::Color(color),
             albedo,
-            surface: SurfaceType::Diffuse
+            surface: SurfaceType::Diffuse,
         }
     }
 
@@ -82,7 +85,7 @@ impl Material {
         Material {
             color: Coloration::Color(color),
             albedo,
-            surface: SurfaceType::Reflective { reflectivity: refl }
+            surface: SurfaceType::Reflective { reflectivity: refl },
         }
     }
 
@@ -90,13 +93,18 @@ impl Material {
         Material {
             color: Coloration::Texture(image),
             albedo,
-            surface: SurfaceType::Diffuse
+            surface: SurfaceType::Diffuse,
         }
     }
 }
 
 pub trait Structure {
-    fn get_intersection(&self, ray: &Ray, position: &WorldPosition, scale: &Scale) -> Option<Intersection>;
+    fn get_intersection(
+        &self,
+        ray: &Ray,
+        position: &WorldPosition,
+        scale: &Scale,
+    ) -> Option<Intersection>;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -109,18 +117,19 @@ pub struct Object {
     material: Material,
     position: WorldPosition,
     structure: Box<Structure + Send + Sync>,
-    scale: Scale
+    scale: Scale,
 }
 
 impl Object {
     pub fn intersect(&self, ray: &Ray) -> Option<IntersectionResult> {
-        self.structure.get_intersection(ray, &self.position, &self.scale)
+        self.structure
+            .get_intersection(ray, &self.position, &self.scale)
             .map(|intersection| {
                 IntersectionResult::create(
                     &intersection,
                     self.color_at(intersection.texture_coord()),
                     self.material.albedo,
-                    self.reflectivity_at(intersection.texture_coord())
+                    self.reflectivity_at(intersection.texture_coord()),
                 )
             })
     }
@@ -128,7 +137,7 @@ impl Object {
     fn reflectivity_at(&self, texture_coordinates: TextureCoords) -> Option<f32> {
         match self.material.surface {
             SurfaceType::Reflective { reflectivity } => Some(reflectivity),
-            _ => None
+            _ => None,
         }
     }
 
@@ -137,16 +146,19 @@ impl Object {
     }
 }
 
-impl<E: Structure + Send + Sync> From<ObjectBuilder<E>> for Object where E: 'static {
+impl<E: Structure + Send + Sync> From<ObjectBuilder<E>> for Object
+where
+    E: 'static,
+{
     fn from(builder: ObjectBuilder<E>) -> Self {
         Object {
             material: builder.material,
             structure: builder.structure,
             position: WorldPosition {
                 position: builder.position,
-                rotation: builder.rotation
+                rotation: builder.rotation,
             },
-            scale: builder.scale
+            scale: builder.scale,
         }
     }
 }
@@ -156,9 +168,8 @@ pub struct ObjectBuilder<E: Structure + Send + Sync> {
     structure: Box<E>,
     position: Point,
     rotation: Quaternion<f64>,
-    scale: Scale
+    scale: Scale,
 }
-
 
 impl<E: Structure + Send + Sync> ObjectBuilder<E> {
     pub fn create_for(object: E) -> ObjectBuilder<E> {
@@ -166,12 +177,12 @@ impl<E: Structure + Send + Sync> ObjectBuilder<E> {
             material: Material {
                 color: Coloration::Color(Color::from_rgb(0.5, 0.5, 0.5)),
                 surface: SurfaceType::Diffuse,
-                albedo: 0.1
+                albedo: 0.1,
             },
             position: Point::new(0.0, 0.0, 0.0),
-            rotation: Quaternion::new(0.0, 0.0, 0.0, 0.0).normalize(),
+            rotation: Quaternion::one(),
             structure: Box::new(object),
-            scale: 1.0
+            scale: 1.0,
         }
     }
 
@@ -198,15 +209,31 @@ impl<E: Structure + Send + Sync> ObjectBuilder<E> {
 
 #[cfg(test)]
 mod test {
-    use objects::{ObjectBuilder, Object, Sphere, WorldPosition};
+    use cgmath::{Quaternion, Zero};
+    use objects::{Object, ObjectBuilder, Sphere, WorldPosition};
     use types::Point;
-    use cgmath::{Zero, Quaternion};
 
     #[test]
     fn test_create_sphere() {
-        let obj: Object = ObjectBuilder::create_for(Sphere::create(20.0)).at_position(Point::zero()).into();
+        let obj: Object = ObjectBuilder::create_for(Sphere::create(20.0))
+            .at_position(Point {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+            })
+            .into();
 
-        assert_eq!(obj.position, WorldPosition { position: Point::zero(), rotation: Quaternion::zero() });
+        assert_eq!(
+            obj.position,
+            WorldPosition {
+                position: Point {
+                    x: 0.0,
+                    y: 0.0,
+                    z: 0.0
+                },
+                rotation: Quaternion::zero()
+            }
+        );
         assert_eq!(obj.material.albedo, 0.1);
     }
 }

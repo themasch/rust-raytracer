@@ -1,17 +1,21 @@
-use cgmath::{Vector3, Point3};
+use cgmath::{Point3, Vector3};
 use image::Rgba;
-use std::ops::{Mul, Add};
+use std::ops::{Add, Mul};
 
 #[derive(Debug, Copy, Clone)]
 pub struct Color {
     pub red: f32,
     pub green: f32,
-    pub blue: f32
+    pub blue: f32,
 }
 
 impl Color {
     pub fn from_rgb(r: f32, g: f32, b: f32) -> Color {
-        Color { red: r, green: g, blue: b }
+        Color {
+            red: r,
+            green: g,
+            blue: b,
+        }
     }
 
     pub fn from_rgba(source: Rgba<u8>) -> Color {
@@ -28,8 +32,8 @@ impl Color {
                 (self.red * 255.0).round() as u8,
                 (self.green * 255.0).round() as u8,
                 (self.blue * 255.0).round() as u8,
-                0
-            ]
+                0,
+            ],
         }
     }
 
@@ -49,7 +53,7 @@ impl Mul for Color {
         Color {
             red: self.red * other.red,
             blue: self.blue * other.blue,
-            green: self.green * other.green
+            green: self.green * other.green,
         }
     }
 }
@@ -61,7 +65,7 @@ impl Mul<f32> for Color {
         Color {
             red: self.red * other,
             blue: self.blue * other,
-            green: self.green * other
+            green: self.green * other,
         }
     }
 }
@@ -73,7 +77,7 @@ impl Add for Color {
         Color {
             red: self.red + other.red,
             blue: self.blue + other.blue,
-            green: self.green + other.green
+            green: self.green + other.green,
         }
     }
 }

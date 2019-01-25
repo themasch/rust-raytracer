@@ -1,13 +1,13 @@
-use raycast::{Ray, IntersectionResult};
-use objects::Object;
 use light::Light;
+use objects::Object;
+use raycast::{IntersectionResult, Ray};
 
 pub struct Scene {
     pub width: u32,
     pub height: u32,
     pub fov: f64,
     pub objects: Vec<Object>,
-    pub lights: Vec<Light>
+    pub lights: Vec<Light>,
 }
 
 impl Scene {
@@ -15,7 +15,7 @@ impl Scene {
         self.objects
             .iter()
             .filter_map(|object| object.intersect(ray))
-            .filter(|intersection| intersection.distance() > 0.0)
+            .filter(|intersection| intersection.distance() > 1e-13)
             .min()
     }
 }
@@ -25,7 +25,7 @@ pub struct SceneBuilder {
     height: u32,
     fov: f64,
     objects: Vec<Object>,
-    lights: Vec<Light>
+    lights: Vec<Light>,
 }
 
 impl SceneBuilder {
@@ -35,7 +35,7 @@ impl SceneBuilder {
             height: height,
             fov: 90.0,
             objects: Vec::new(),
-            lights: Vec::new()
+            lights: Vec::new(),
         }
     }
 
@@ -60,7 +60,7 @@ impl SceneBuilder {
             height: self.height,
             fov: self.fov,
             objects: self.objects,
-            lights: self.lights
+            lights: self.lights,
         }
     }
 }

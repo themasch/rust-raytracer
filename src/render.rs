@@ -1,35 +1,38 @@
-
-use std::sync::Arc;
-use std::sync::mpsc::channel;
-use std::f32::consts::PI;
 use std::cmp::min;
+use std::f32::consts::PI;
+use std::sync::mpsc::channel;
+use std::sync::Arc;
 
 use cgmath::prelude::*;
-use threadpool::ThreadPool;
 use num_cpus;
+use threadpool::ThreadPool;
 
-use scene::Scene;
-use raycast::{Ray, IntersectionResult};
 use image::{DynamicImage, GenericImage};
+use raycast::{IntersectionResult, Ray};
+use scene::Scene;
 use types::Color;
-
 
 fn shade_diffuse(scene: &Scene, intersection: &IntersectionResult) -> Color {
     let mut color = Color::from_rgb(0.0, 0.0, 0.0);
-
+    //println!("sn: {:?}", intersection.surface_normal());
     for light in &scene.lights {
-        let direction_to_light = -light.direction().normalize();
+        let direction_to_light = (-light.direction()).normalize();
         let shadow_ray = Ray::create_shadow_ray(direction_to_light, intersection);
-
         let shadow_trace = scene.trace(&shadow_ray);
-        let in_light = shadow_trace.is_none();
-
-        let light_intensity = if in_light { light.intensity() } else { 0.0 };
-        let light_power = (intersection.surface_normal().dot(direction_to_light) as f32).max(0.0) * light_intensity;
-
-        let light_reflected = intersection.albedo() / PI;
-
-        color = color + (intersection.color() * light.color().clone() * light_power * light_reflected);
+        if shadow_trace.is_none() {
+            let light_intensity = light.intensity();
+            let light_power = (intersection.surface_normal().dot(direction_to_light) as f32).abs();
+            let light_reflected = intersection.albedo() / PI;
+            //  println!("P: {:?} \t R: {:?} ", light_power, light_reflected);
+            color = color
+                + (intersection.color()
+                    * light.color().clone()
+                    * light_power
+                    * light_intensity
+                    * light_reflected);
+        } else {
+            //println!("SHADOW distance: {:?}", shadow_trace.unwrap().distance());
+        }
     }
 
     color
@@ -51,7 +54,8 @@ pub fn cast_ray(scene: &Scene, ray: &Ray, depth: u32) -> Color {
         return Color::from_rgb(0.0, 0.0, 0.0);
     }
 
-    scene.trace(&ray)
+    scene
+        .trace(&ray)
         .map(|int| get_color(scene, &ray, &int, depth))
         .unwrap_or(Color::from_rgb(0.0, 0.0, 0.0))
 }
@@ -77,11 +81,15 @@ pub fn render(scene: Scene) -> DynamicImage {
         let mscene = asc.clone();
         let tx = tx.clone();
         pool.execute(move || {
-            let tile_width = min((mx + tile_size), sw) - mx;
-            let tile_height = min((my + tile_size), sh) - my;
+            let tile_width = min(mx + tile_size, sw) - mx;
+            let tile_height = min(my + tile_size, sh) - my;
             let mut image = DynamicImage::new_rgb8(tile_width, tile_height);
+
             for x in 0..tile_width {
                 for y in 0..tile_height {
+                    if !(mx + x > 380 && mx + x < 420 && my + y > 80 && my + y < 100) {
+                        //  continue;
+                    }
                     let ray = Ray::create_prime(mx + x, my + y, &*mscene);
 
                     if let Some(inter) = mscene.trace(&ray) {
@@ -103,12 +111,9 @@ pub fn render(scene: Scene) -> DynamicImage {
             println!("{:?} of {:?} done", counter, jobs);
         })
         .take(jobs as usize)
-        .fold(
-            DynamicImage::new_rgb8(sw, sh),
-            |mut image, result| {
-                let (part, x, y) = result;
-                image.copy_from(&part, x, y);
-                image
-            }
-        )
+        .fold(DynamicImage::new_rgb8(sw, sh), |mut image, result| {
+            let (part, x, y) = result;
+            image.copy_from(&part, x, y);
+            image
+        })
 }

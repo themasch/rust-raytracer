@@ -1,12 +1,12 @@
-use objects::{TextureCoords, Structure, WorldPosition};
-use types::{Point, Direction, Scale};
-use raycast::{Ray, Intersection};
 use cgmath::prelude::*;
+use objects::{Structure, TextureCoords, WorldPosition};
+use raycast::{Intersection, Ray};
+use types::{Direction, Point, Scale};
 
 use std::f32::consts::PI;
 
 pub struct Sphere {
-    pub radius: f64
+    pub radius: f64,
 }
 
 impl Sphere {
@@ -40,17 +40,27 @@ impl Sphere {
         (*hit_point - position.position).normalize()
     }
 
-    fn texture_coord(&self, hit_point: &Point, position: &WorldPosition, scale: &Scale) -> TextureCoords {
+    fn texture_coord(
+        &self,
+        hit_point: &Point,
+        position: &WorldPosition,
+        scale: &Scale,
+    ) -> TextureCoords {
         let hit_vec = *hit_point - position.position;
         TextureCoords {
             x: (1.0 + (hit_vec.z.atan2(hit_vec.x) as f32) / PI) * 0.5,
-            y: (hit_vec.y / (self.radius * scale)).acos() as f32 / PI
+            y: (hit_vec.y / (self.radius * scale)).acos() as f32 / PI,
         }
     }
 }
 
 impl Structure for Sphere {
-    fn get_intersection(&self, ray: &Ray, position: &WorldPosition, scale: &Scale) -> Option<Intersection> {
+    fn get_intersection(
+        &self,
+        ray: &Ray,
+        position: &WorldPosition,
+        scale: &Scale,
+    ) -> Option<Intersection> {
         self.intersect(ray, position, scale).map(|distance| {
             let hit_point = ray.origin + ray.direction * distance;
             Intersection::new(

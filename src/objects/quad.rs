@@ -1,10 +1,10 @@
-use objects::WorldPosition;
 use cgmath::prelude::*;
+use objects::WorldPosition;
+use raycast::Ray;
 use types::Point;
-use raycast::{Ray, Intersection};
 
 pub struct Quad {
-    size: Point
+    size: Point,
 }
 
 impl Quad {
