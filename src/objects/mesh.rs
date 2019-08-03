@@ -76,13 +76,11 @@ impl Triangle {
     pub fn intersects(
         &self,
         ray: &Ray,
-        position: &WorldPosition,
-        scale: &Scale,
+        position: &WorldPosition
     ) -> Option<(Direction, TextureCoords, f64)> {
-        let posvec = position.position.to_vec();
-        let point_0 = position.rotation.rotate_point(self.p1) * *scale + posvec;
-        let point_1 = position.rotation.rotate_point(self.p2) * *scale + posvec;
-        let point_2 = position.rotation.rotate_point(self.p3) * *scale + posvec;
+        let point_0 = position.translate(self.p1);
+        let point_1 = position.translate(self.p2);
+        let point_2 = position.translate(self.p3);
         let edge_1 = point_1 - point_0;
         let edge_2 = point_2 - point_0;
 
@@ -129,10 +127,9 @@ impl Structure for Mesh {
     fn get_intersection(
         &self,
         ray: &Ray,
-        position: &WorldPosition,
-        scale: &Scale,
+        position: &WorldPosition
     ) -> Option<Intersection> {
-        self.intersect(ray, position, scale).map(|result| {
+        self.intersect(ray, position).map(|result| {
             let (normal, texc, distance) = result;
             let hit_point = ray.origin + ray.direction * distance;
             Intersection::new(distance, hit_point, texc, normal)
@@ -144,16 +141,15 @@ impl Mesh {
     fn intersect(
         &self,
         ray: &Ray,
-        position: &WorldPosition,
-        scale: &Scale,
+        position: &WorldPosition
     ) -> Option<(Direction, TextureCoords, f64)> {
-        if !self.check_bb(ray, position, scale) {
+        if !self.check_bb(ray, position) {
             return None;
         }
 
         self.triangles
             .iter()
-            .filter_map(|triangle| triangle.intersects(ray, position, scale))
+            .filter_map(|triangle| triangle.intersects(ray, position))
             .min_by(|f1, f2| f1.2.partial_cmp(&f2.2).unwrap())
     }
 
@@ -186,7 +182,7 @@ impl Mesh {
         return (center, Sphere::create(distance));
     }
 
-    fn check_bb(&self, ray: &Ray, position: &WorldPosition, scale: &Scale) -> bool {
+    fn check_bb(&self, ray: &Ray, position: &WorldPosition) -> bool {
         let center = self.bb.0 + position.position.to_vec();
         self.bb
             .1
@@ -195,8 +191,8 @@ impl Mesh {
                 &WorldPosition {
                     position: center,
                     rotation: position.rotation,
-                },
-                scale,
+                    scale: position.scale
+                }
             )
             .is_some()
     }

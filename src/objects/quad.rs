@@ -9,8 +9,8 @@ pub struct Quad {
 
 impl Quad {
     pub fn intersects(&self, ray: &Ray, position: &WorldPosition) -> bool {
-        let pmin = position.position;
-        let pmax = position.position + self.size.to_vec();
+        let pmin = position.translate(Point::new(0.0, 0.0, 0.0));
+        let pmax = position.translate(self.size);
 
         let tmin = (pmin.x - ray.origin.x) / ray.direction.x;
         let tmax = (pmax.x - ray.origin.x) / ray.direction.x;

@@ -1,5 +1,5 @@
 use cgmath::prelude::*;
-use cgmath::Quaternion;
+use cgmath::{Quaternion, Vector3};
 use image::{DynamicImage, GenericImage};
 use raycast::{Intersection, IntersectionResult, Ray};
 use types::{Color, Point, Scale};
@@ -102,8 +102,7 @@ pub trait Structure {
     fn get_intersection(
         &self,
         ray: &Ray,
-        position: &WorldPosition,
-        scale: &Scale,
+        position: &WorldPosition
     ) -> Option<Intersection>;
 }
 
@@ -111,19 +110,25 @@ pub trait Structure {
 pub struct WorldPosition {
     pub position: Point,
     pub rotation: Quaternion<f64>,
+    pub scale: Scale
+}
+
+impl WorldPosition {
+    pub fn translate(&self, vec: Point) -> Point {
+        self.rotation.rotate_point(vec) * self.scale + self.position.to_vec()
+    }
 }
 
 pub struct Object {
     material: Material,
     position: WorldPosition,
-    structure: Box<Structure + Send + Sync>,
-    scale: Scale,
+    structure: Box<Structure + Send + Sync>
 }
 
 impl Object {
     pub fn intersect(&self, ray: &Ray) -> Option<IntersectionResult> {
         self.structure
-            .get_intersection(ray, &self.position, &self.scale)
+            .get_intersection(ray, &self.position)
             .map(|intersection| {
                 IntersectionResult::create(
                     &intersection,
@@ -157,8 +162,9 @@ where
             position: WorldPosition {
                 position: builder.position,
                 rotation: builder.rotation,
-            },
-            scale: builder.scale,
+                scale: builder.scale
+
+            }
         }
     }
 }
@@ -168,7 +174,7 @@ pub struct ObjectBuilder<E: Structure + Send + Sync> {
     structure: Box<E>,
     position: Point,
     rotation: Quaternion<f64>,
-    scale: Scale,
+    scale: Scale
 }
 
 impl<E: Structure + Send + Sync> ObjectBuilder<E> {
@@ -231,7 +237,8 @@ mod test {
                     y: 0.0,
                     z: 0.0
                 },
-                rotation: Quaternion::zero()
+                rotation: Quaternion::zero(),
+                scale: 1.0
             }
         );
         assert_eq!(obj.material.albedo, 0.1);
