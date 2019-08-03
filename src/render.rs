@@ -14,24 +14,20 @@ use types::Color;
 
 fn shade_diffuse(scene: &Scene, intersection: &IntersectionResult) -> Color {
     let mut color = Color::from_rgb(0.0, 0.0, 0.0);
-    //println!("sn: {:?}", intersection.surface_normal());
     for light in &scene.lights {
         let direction_to_light = (-light.direction()).normalize();
         let shadow_ray = Ray::create_shadow_ray(direction_to_light, intersection);
-        let shadow_trace = scene.trace(&shadow_ray);
+        let shadow_trace : Option<IntersectionResult> = scene.trace(&shadow_ray);
         if shadow_trace.is_none() {
             let light_intensity = light.intensity();
             let light_power = (intersection.surface_normal().dot(direction_to_light) as f32).abs();
             let light_reflected = intersection.albedo() / PI;
-            //  println!("P: {:?} \t R: {:?} ", light_power, light_reflected);
             color = color
                 + (intersection.color()
                     * light.color().clone()
                     * light_power
                     * light_intensity
                     * light_reflected);
-        } else {
-            //println!("SHADOW distance: {:?}", shadow_trace.unwrap().distance());
         }
     }
 

@@ -61,7 +61,8 @@ impl Triangle {
             let n1 = position.rotation.rotate_vector(n1);
             let n2 = position.rotation.rotate_vector(n2);
             let n3 = position.rotation.rotate_vector(n3);
-            (n1 * u + n2 * v + n3 * (1.0 - u - v)).normalize()
+            let w = (1.0 - u - v);
+            (n1 * w + n2 * u + n3 * v).normalize()
         } else {
             let vec_a = self.p2 - self.p1;
             let vec_b = self.p3 - self.p1;
@@ -70,58 +71,49 @@ impl Triangle {
         }
     }
 
+    /// implements möller-trumbore
+    /// http://webserver2.tecgraf.puc-rio.br/~mgattass/cg/trbRR/Fast%20MinimumStorage%20RayTriangle%20Intersection.pdf
     pub fn intersects(
         &self,
         ray: &Ray,
         position: &WorldPosition,
         scale: &Scale,
     ) -> Option<(Direction, TextureCoords, f64)> {
-        let point1 = position.rotation.rotate_point(self.p1) * *scale + position.position.to_vec();
-        let point2 = position.rotation.rotate_point(self.p2) * *scale + position.position.to_vec();
-        let point3 = position.rotation.rotate_point(self.p3) * *scale + position.position.to_vec();
-        let vec_a = point2 - point1;
-        let vec_b = point3 - point1;
-        let normal = vec_a.cross(vec_b);
-        let area2 = normal.magnitude();
+        let posvec = position.position.to_vec();
+        let point_0 = position.rotation.rotate_point(self.p1) * *scale + posvec;
+        let point_1 = position.rotation.rotate_point(self.p2) * *scale + posvec;
+        let point_2 = position.rotation.rotate_point(self.p3) * *scale + posvec;
+        let edge_1 = point_1 - point_0;
+        let edge_2 = point_2 - point_0;
 
-        let n_dot_dir = normal.dot(ray.direction);
-        if n_dot_dir.abs() < EPSILON {
-            // ray and plane are parallel
+        let pvec = ray.direction.cross(edge_2);
+
+        let det = edge_1.dot(pvec);
+        if det < EPSILON {
             return None;
         }
 
-        let d = normal.dot(point1.to_vec());
-        let dt = normal.dot(ray.origin.to_vec());
-        let t = (dt + d) / n_dot_dir;
+        let tvec = ray.origin - point_0;
+        let u = tvec.dot(pvec);
 
-        if t < 0.0 {
-            // plane is behind the start if the ray
+        if u < 0.0 || u > det {
             return None;
         }
 
-        let p = ray.origin + t * ray.direction;
-        if normal.dot(vec_a.cross(p - point1)) < 0.0 {
+        let qvec = tvec.cross(edge_1);
+        let v = ray.direction.dot(qvec);
+
+        if v < 0.0 || u + v > det {
             return None;
         }
 
-        let c = (point3 - point2).cross(p - point2);
-        let u = c.magnitude() / area2;
-        if normal.dot(c) < 0.0 {
-            return None;
-        }
-
-        let c = (point1 - point3).cross(p - point3);
-        let v = c.magnitude() / area2;
-        if normal.dot(c) < 0.0 {
-            return None;
-        }
+        let t = edge_2.dot(qvec);
+        let inv_det = 1.0 / det;
+        let t = t * inv_det;
+        let u = u * inv_det;
+        let v = v * inv_det;
 
         let normal = self.surface_normal(u, v, position);
-
-        if ray.ray_type == RayType::Shadow {
-            //println!("shadow ray intersection at {:?}, {:?}, {:?}", (u, v), normal, ray.direction);
-            //println!("hit point {:?}",  p);
-        }
 
         Some((normal, TextureCoords { x: 0.0, y: 0.0 }, t))
     }

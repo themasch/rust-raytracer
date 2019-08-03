@@ -50,14 +50,16 @@ fn main() {
     //let simple =  String::from(str);
     //let teapot_read = wavefront_obj::obj::parse(simple);
     let teapot_read = wavefront_obj::obj::parse(String::from(include_str!("../teapot.obj")));
+
     if let Err(err) = teapot_read {
         panic!("{:?}", err);
     }
 
     let teapot = teapot_read.unwrap();
-    let pot = teapot.objects.get(0);
+    // find first object
+    let object = teapot.objects.iter().find( | p | p.vertices.len() > 0).expect("no object found");
 
-    let scene = SceneBuilder::new(1600, 1600)
+    let scene = SceneBuilder::new(1000, 1000)
         /*.add_object(
             ObjectBuilder::create_for(Sphere::create(1.0))
                 .at_position(Point::new(0.0, 0.0, -5.0))
@@ -111,7 +113,7 @@ fn main() {
                 .into(),
         )
         .add_object(
-            ObjectBuilder::create_for(Mesh::create(pot.unwrap().clone()))
+            ObjectBuilder::create_for(Mesh::create(object.clone()))
                 /*.with_material(Material::reflective_color(
                     Color::from_rgb(0.6, 0.6, 0.6),
                     0.2,
