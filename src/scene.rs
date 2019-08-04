@@ -1,11 +1,31 @@
 use light::Light;
 use objects::Object;
 use raycast::{IntersectionResult, Ray};
+use types::Direction;
+use cgmath::InnerSpace;
 
-pub struct Scene {
+pub struct Camera {
     pub width: u32,
     pub height: u32,
     pub fov: f64,
+}
+
+impl Camera {
+    pub fn to_sensor_direction(&self, x: f64, y: f64) -> Direction {
+        let fov_adjustment = (self.fov.to_radians() / 2.0).tan();
+        let aspect_ratio = self.width as f64 / self.height as f64;
+        let sensor_x = (((x + 0.5) / self.width as f64) * 2.0 - 1.0) * aspect_ratio * fov_adjustment;
+        let sensor_y = (1.0 - ((y + 0.5) / self.height as f64) * 2.0) * fov_adjustment;
+
+        Direction {
+            x: sensor_x,
+            y: sensor_y,
+            z: -1.0,
+        }.normalize()
+    }
+}
+
+pub struct Scene {
     pub objects: Vec<Object>,
     pub lights: Vec<Light>,
 }
@@ -21,30 +41,19 @@ impl Scene {
 }
 
 pub struct SceneBuilder {
-    width: u32,
-    height: u32,
-    fov: f64,
     objects: Vec<Object>,
     lights: Vec<Light>,
 }
 
 impl SceneBuilder {
-    pub fn new(width: u32, height: u32) -> SceneBuilder {
+    pub fn new() -> SceneBuilder {
         SceneBuilder {
-            width: width,
-            height: height,
-            fov: 90.0,
             objects: Vec::new(),
             lights: Vec::new(),
         }
     }
 
-    pub fn with_fov(mut self, fov: f64) -> SceneBuilder {
-        self.fov = fov;
-        self
-    }
-
-    pub fn add_object(mut self, obj: Object) -> SceneBuilder {
+   pub fn add_object(mut self, obj: Object) -> SceneBuilder {
         self.objects.push(obj);
         self
     }
@@ -56,9 +65,6 @@ impl SceneBuilder {
 
     pub fn finish(self) -> Scene {
         Scene {
-            width: self.width,
-            height: self.height,
-            fov: self.fov,
             objects: self.objects,
             lights: self.lights,
         }

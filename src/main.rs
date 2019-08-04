@@ -22,7 +22,7 @@ use cgmath::Quaternion;
 use light::*;
 use objects::{Material, Mesh, ObjectBuilder, Plane, Sphere};
 use render::render;
-use scene::SceneBuilder;
+use scene::{SceneBuilder, Camera};
 use types::{Color, Direction, Point};
 
 fn format_time(duration: &Duration) -> f64 {
@@ -51,56 +51,16 @@ fn main() {
     // find first object
     let object = teapot.objects.iter().find( | p | p.vertices.len() > 0).expect("no object found");
 
-    let scene = SceneBuilder::new(1000, 1000)
-        /*.add_object(
-            ObjectBuilder::create_for(Sphere::create(1.0))
-                .at_position(Point::new(0.0, 0.0, -5.0))
-                .with_material(Material::reflective_color(
-                    Color::from_rgb(0.2, 1.0, 0.2),
-                    0.18,
-                    0.7
-                ))
-                .into()
-        )
-        .add_object(
-            ObjectBuilder::create_for(Sphere::create(2.0))
-                .at_position(Point::new(-3.0, 1.0, -6.0))
-                .with_material(Material::reflective_color(
-                    Color::from_rgb(0.2, 0.3, 0.8),
-                    0.58,
-                    0.0
-                ))
-                .into()
-        )*/
-        /*.add_object(
-            ObjectBuilder::create_for(Sphere::create(3.5))
-                .at_position(Point::new(0.0, 0.0, -6.0))
-                .with_material(Material::reflective_color(
-                    Color::from_rgb(0.5, 0.5, 0.5),
-                    0.18,
-                    0.0
-                ))
-                .into()
-        )*/
+    let scene = SceneBuilder::new()
         .add_object(
             ObjectBuilder::create_for(Plane::create(Direction::new(0.0, -1.0, 0.0)))
                 .at_position(Point::new(0.0, -4.0, 0.0))
-                /*.with_material(Material::reflective_color(
-                    Color::from_rgb(0.2, 0.3, 0.4),
-                    0.15,
-                    0.0
-                ))*/
                 .with_material(Material::diffuse_color(Color::from_rgb(0.2, 0.3, 0.4), 0.2))
                 .into(),
         )
         .add_object(
             ObjectBuilder::create_for(Plane::create(Direction::new(0.0, 0.0, -1.0).normalize()))
                 .at_position(Point::new(0.0, 0.0, -20.0))
-                /*.with_material(Material::reflective_color(
-                    Color::from_rgb(0.5, 1.0, 0.5),
-                    0.20,
-                    0.0
-                ))*/
                 .with_material(Material::diffuse_color(Color::from_rgb(0.5, 1.0, 0.5), 0.2))
                 .into(),
         )
@@ -111,22 +71,11 @@ fn main() {
                     0.2,
                     0.02
                 ))
-                //.with_material(Material::diffuse_color(Color::from_rgb(0.5, 0.5, 0.5), 0.2))
                 .scale(1.0)
                 .rotation(Quaternion::one() + Quaternion::from_angle_y(rotation))
                 .at_position(Point::new(0.0, -2.0, -6.0))
                 .into(),
         )
-        /*.add_object(&Plane {
-            origin: Point::new(0.0, 0.0, -20.0),
-            normal: Direction::new(0.0, 0.0, -1.0).normalize(),
-            material: Material::diffuse_color(Color::from_rgb(0.0, 0.0, 1.0), 0.3)
-        })
-        .add_object(&Plane {
-            origin: Point::new(0.0, -2.0, -5.0),
-            normal: Direction::new(0.0, -1.0, 0.0).normalize(),
-            material: Material::reflective_color(Color::from_rgb(0.1, 0.3, 0.6), 0.3, 0.1)
-        })*/
         .add_light(Light::Directional(DirectionalLight {
             direction: Direction::new(0.25, 0.0, -1.0).normalize(),
             color: Color::from_rgb(1.0, 1.0, 1.0),
@@ -139,8 +88,14 @@ fn main() {
         }))
         .finish();
 
+    let camera = Camera {
+        width: 1000,
+        height: 1000,
+        fov: 90.0
+    };
+
     let before_render = Instant::now();
-    let image = render(scene);
+    let image = render(scene, camera);
     let before_save = Instant::now();
     let ref mut fout = File::create(&Path::new("test.png")).unwrap();
     match image.save(fout, image::PNG) {

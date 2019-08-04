@@ -9,7 +9,7 @@ use threadpool::ThreadPool;
 
 use image::{DynamicImage, GenericImage};
 use raycast::{IntersectionResult, Ray};
-use scene::Scene;
+use scene::{Scene, Camera};
 use types::Color;
 
 fn shade_diffuse(scene: &Scene, intersection: &IntersectionResult) -> Color {
@@ -56,18 +56,19 @@ pub fn cast_ray(scene: &Scene, ray: &Ray, depth: u32) -> Color {
         .unwrap_or(Color::from_rgb(0.0, 0.0, 0.0))
 }
 
-pub fn render(scene: Scene) -> DynamicImage {
+pub fn render(scene: Scene, camera: Camera) -> DynamicImage {
     let workers = num_cpus::get();
     let pool = ThreadPool::new(workers);
 
-    let sw = scene.width;
-    let sh = scene.height;
+    let sw = camera.width;
+    let sh = camera.height;
 
     let tile_size = 128;
-    let cols = (scene.width as f32 / tile_size as f32).ceil() as u32;
-    let rows = (scene.height as f32 / tile_size as f32).ceil() as u32;
+    let cols = (camera.width as f32 / tile_size as f32).ceil() as u32;
+    let rows = (camera.height as f32 / tile_size as f32).ceil() as u32;
     let jobs = cols * rows;
     let asc = Arc::new(scene);
+    let camera = Arc::new(camera);
 
     let (tx, rx) = channel();
     for job_idx in 0..jobs {
@@ -76,6 +77,7 @@ pub fn render(scene: Scene) -> DynamicImage {
         let black = Color::from_rgb(0.0, 0.0, 0.0).to_rgba8();
         let mscene = asc.clone();
         let tx = tx.clone();
+        let camera = camera.clone();
         pool.execute(move || {
             let tile_width = min(mx + tile_size, sw) - mx;
             let tile_height = min(my + tile_size, sh) - my;
@@ -86,7 +88,7 @@ pub fn render(scene: Scene) -> DynamicImage {
                     if !(mx + x > 380 && mx + x < 420 && my + y > 80 && my + y < 100) {
                         //  continue;
                     }
-                    let ray = Ray::create_prime(mx + x, my + y, &*mscene);
+                    let ray = Ray::create_prime(mx + x, my + y, &*mscene, &camera);
 
                     if let Some(inter) = mscene.trace(&ray) {
                         let color = get_color(&*mscene, &ray, &inter, 0);
