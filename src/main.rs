@@ -22,7 +22,7 @@ use cgmath::Quaternion;
 use light::*;
 use objects::{Material, Mesh, ObjectBuilder, Plane, Sphere};
 use render::render;
-use scene::{SceneBuilder, Camera};
+use scene::{Camera, SceneBuilder};
 use types::{Color, Direction, Point};
 
 fn format_time(duration: &Duration) -> f64 {
@@ -49,7 +49,11 @@ fn main() {
 
     let teapot = teapot_read.unwrap();
     // find first object
-    let object = teapot.objects.iter().find( | p | p.vertices.len() > 0).expect("no object found");
+    let object = teapot
+        .objects
+        .iter()
+        .find(|p| p.vertices.len() > 0)
+        .expect("no object found");
 
     let scene = SceneBuilder::new()
         .add_object(
@@ -69,7 +73,7 @@ fn main() {
                 .with_material(Material::reflective_color(
                     Color::from_rgb(0.6, 0.6, 0.6),
                     0.2,
-                    0.02
+                    0.02,
                 ))
                 .scale(1.0)
                 .rotation(Quaternion::one() + Quaternion::from_angle_y(rotation))
@@ -91,7 +95,7 @@ fn main() {
     let camera = Camera {
         width: 1000,
         height: 1000,
-        fov: 90.0
+        fov: 90.0,
     };
 
     let before_render = Instant::now();

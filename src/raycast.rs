@@ -1,6 +1,6 @@
 use cgmath::prelude::*;
 use objects::TextureCoords;
-use scene::{Scene, Camera};
+use scene::{Camera, Scene};
 use types::{Color, Direction, Point};
 
 use std::cmp::Ordering;
@@ -67,7 +67,7 @@ impl Ray {
             inv_direction: Direction {
                 x: 1.0 / direction.x,
                 y: 1.0 / direction.y,
-                z: 1.0 / direction.z
+                z: 1.0 / direction.z,
             },
             direction: direction,
             ray_type: RayType::Prime,
@@ -75,13 +75,14 @@ impl Ray {
     }
 
     pub fn create_reflection(ray_direction: &Direction, int: &IntersectionResult) -> Ray {
-        let direction = ray_direction - (2.0 * ray_direction.dot(int.surface_normal()) * int.surface_normal());
+        let direction =
+            ray_direction - (2.0 * ray_direction.dot(int.surface_normal()) * int.surface_normal());
         Ray {
             origin: int.reflection_origin(),
             inv_direction: Direction {
                 x: 1.0 / direction.x,
                 y: 1.0 / direction.y,
-                z: 1.0 / direction.z
+                z: 1.0 / direction.z,
             },
             direction: direction,
             ray_type: RayType::Reflection,
@@ -94,7 +95,7 @@ impl Ray {
             inv_direction: Direction {
                 x: 1.0 / direction_to_light.x,
                 y: 1.0 / direction_to_light.y,
-                z: 1.0 / direction_to_light.z
+                z: 1.0 / direction_to_light.z,
             },
             direction: direction_to_light,
             ray_type: RayType::Shadow,

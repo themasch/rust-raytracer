@@ -40,11 +40,7 @@ impl Sphere {
         (*hit_point - position.position).normalize()
     }
 
-    fn texture_coord(
-        &self,
-        hit_point: &Point,
-        position: &WorldPosition
-    ) -> TextureCoords {
+    fn texture_coord(&self, hit_point: &Point, position: &WorldPosition) -> TextureCoords {
         let hit_vec = *hit_point - position.position;
         TextureCoords {
             x: (1.0 + (hit_vec.z.atan2(hit_vec.x) as f32) / PI) * 0.5,
@@ -54,11 +50,7 @@ impl Sphere {
 }
 
 impl Structure for Sphere {
-    fn get_intersection(
-        &self,
-        ray: &Ray,
-        position: &WorldPosition
-    ) -> Option<Intersection> {
+    fn get_intersection(&self, ray: &Ray, position: &WorldPosition) -> Option<Intersection> {
         self.intersect(ray, position).map(|distance| {
             let hit_point = ray.origin + ray.direction * distance;
             Intersection::new(

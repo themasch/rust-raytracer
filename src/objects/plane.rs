@@ -52,11 +52,7 @@ impl Plane {
 }
 
 impl Structure for Plane {
-    fn get_intersection(
-        &self,
-        ray: &Ray,
-        position: &WorldPosition
-    ) -> Option<Intersection> {
+    fn get_intersection(&self, ray: &Ray, position: &WorldPosition) -> Option<Intersection> {
         self.intersect(ray, position).map(|distance| {
             let hit_point = ray.origin + ray.direction * distance;
             Intersection::new(

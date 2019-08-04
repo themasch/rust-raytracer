@@ -99,18 +99,14 @@ impl Material {
 }
 
 pub trait Structure {
-    fn get_intersection(
-        &self,
-        ray: &Ray,
-        position: &WorldPosition
-    ) -> Option<Intersection>;
+    fn get_intersection(&self, ray: &Ray, position: &WorldPosition) -> Option<Intersection>;
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct WorldPosition {
     pub position: Point,
     pub rotation: Quaternion<f64>,
-    pub scale: Scale
+    pub scale: Scale,
 }
 
 impl WorldPosition {
@@ -122,7 +118,7 @@ impl WorldPosition {
 pub struct Object {
     material: Material,
     position: WorldPosition,
-    structure: Box<Structure + Send + Sync>
+    structure: Box<Structure + Send + Sync>,
 }
 
 impl Object {
@@ -162,9 +158,8 @@ where
             position: WorldPosition {
                 position: builder.position,
                 rotation: builder.rotation,
-                scale: builder.scale
-
-            }
+                scale: builder.scale,
+            },
         }
     }
 }
@@ -174,7 +169,7 @@ pub struct ObjectBuilder<E: Structure + Send + Sync> {
     structure: Box<E>,
     position: Point,
     rotation: Quaternion<f64>,
-    scale: Scale
+    scale: Scale,
 }
 
 impl<E: Structure + Send + Sync> ObjectBuilder<E> {

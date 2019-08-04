@@ -1,0 +1,71 @@
+Scene(
+    objects: [
+        {
+            object: Plane {
+                direction: (0.0, -1.0, 0.0)
+            },
+            position: (0.0, -4.0, 0.0),
+            material: Diffuse {
+                color: (0.2, 0.3, 0.4),
+                albedo: 0.2
+            }
+        }
+    ]
+
+)
+
+        .add_object(
+            ObjectBuilder::create_for(Plane::create(Direction::new(0.0, -1.0, 0.0)))
+                .at_position(Point::new(0.0, -4.0, 0.0))
+                /*.with_material(Material::reflective_color(
+                    Color::from_rgb(0.2, 0.3, 0.4),
+                    0.15,
+                    0.0
+                ))*/
+                .with_material(Material::diffuse_color(Color::from_rgb(0.2, 0.3, 0.4), 0.2))
+                .into(),
+        )
+        .add_object(
+            ObjectBuilder::create_for(Plane::create(Direction::new(0.0, 0.0, -1.0).normalize()))
+                .at_position(Point::new(0.0, 0.0, -20.0))
+                /*.with_material(Material::reflective_color(
+                    Color::from_rgb(0.5, 1.0, 0.5),
+                    0.20,
+                    0.0
+                ))*/
+                .with_material(Material::diffuse_color(Color::from_rgb(0.5, 1.0, 0.5), 0.2))
+                .into(),
+        )
+        .add_object(
+            ObjectBuilder::create_for(Mesh::create(object.clone()))
+                .with_material(Material::reflective_color(
+                    Color::from_rgb(0.6, 0.6, 0.6),
+                    0.2,
+                    0.02
+                ))
+                //.with_material(Material::diffuse_color(Color::from_rgb(0.5, 0.5, 0.5), 0.2))
+                .scale(1.0)
+                .rotation(Quaternion::one() + Quaternion::from_angle_y(rotation))
+                .at_position(Point::new(0.0, -2.0, -6.0))
+                .into(),
+        )
+        /*.add_object(&Plane {
+            origin: Point::new(0.0, 0.0, -20.0),
+            normal: Direction::new(0.0, 0.0, -1.0).normalize(),
+            material: Material::diffuse_color(Color::from_rgb(0.0, 0.0, 1.0), 0.3)
+        })
+        .add_object(&Plane {
+            origin: Point::new(0.0, -2.0, -5.0),
+            normal: Direction::new(0.0, -1.0, 0.0).normalize(),
+            material: Material::reflective_color(Color::from_rgb(0.1, 0.3, 0.6), 0.3, 0.1)
+        })*/
+        .add_light(Light::Directional(DirectionalLight {
+            direction: Direction::new(0.25, 0.0, -1.0).normalize(),
+            color: Color::from_rgb(1.0, 1.0, 1.0),
+            intensity: 20.0,
+        }))
+        .add_light(Light::Directional(DirectionalLight {
+            direction: Direction::new(0.0, -1.0, -1.0),
+            color: Color::from_rgb(1.0, 1.0, 1.0),
+            intensity: 10.0,
+        }))

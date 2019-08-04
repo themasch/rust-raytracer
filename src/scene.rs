@@ -1,8 +1,8 @@
+use cgmath::InnerSpace;
 use light::Light;
 use objects::Object;
 use raycast::{IntersectionResult, Ray};
 use types::Direction;
-use cgmath::InnerSpace;
 
 pub struct Camera {
     pub width: u32,
@@ -14,14 +14,16 @@ impl Camera {
     pub fn to_sensor_direction(&self, x: f64, y: f64) -> Direction {
         let fov_adjustment = (self.fov.to_radians() / 2.0).tan();
         let aspect_ratio = self.width as f64 / self.height as f64;
-        let sensor_x = (((x + 0.5) / self.width as f64) * 2.0 - 1.0) * aspect_ratio * fov_adjustment;
+        let sensor_x =
+            (((x + 0.5) / self.width as f64) * 2.0 - 1.0) * aspect_ratio * fov_adjustment;
         let sensor_y = (1.0 - ((y + 0.5) / self.height as f64) * 2.0) * fov_adjustment;
 
         Direction {
             x: sensor_x,
             y: sensor_y,
             z: -1.0,
-        }.normalize()
+        }
+        .normalize()
     }
 }
 
@@ -53,7 +55,7 @@ impl SceneBuilder {
         }
     }
 
-   pub fn add_object(mut self, obj: Object) -> SceneBuilder {
+    pub fn add_object(mut self, obj: Object) -> SceneBuilder {
         self.objects.push(obj);
         self
     }

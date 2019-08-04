@@ -1,12 +1,14 @@
 use cgmath::prelude::*;
 use objects::{Sphere, Structure, TextureCoords, WorldPosition};
 use raycast::{Intersection, Ray, RayType};
+use std::cmp::{max, min};
 use types::{Direction, Point, Scale};
 use wavefront_obj::obj;
 
+#[derive(Debug, Clone)]
 struct BoundingBox {
     min: Point,
-    max: Point
+    max: Point,
 }
 
 impl BoundingBox {
@@ -67,6 +69,14 @@ impl Triangle {
         }
     }
 
+    fn center(&self) -> Point {
+        Point {
+            x: (self.p1.x + self.p2.x + self.p3.x) / 3.0,
+            y: (self.p1.y + self.p2.y + self.p3.y) / 3.0,
+            z: (self.p1.z + self.p2.z + self.p3.z) / 3.0,
+        }
+    }
+
     fn with_normals(mut self, n1: &obj::Normal, n2: &obj::Normal, n3: &obj::Normal) -> Triangle {
         self.normals = Some((
             Direction {
@@ -108,7 +118,7 @@ impl Triangle {
     pub fn intersects(
         &self,
         ray: &Ray,
-        position: &WorldPosition
+        position: &WorldPosition,
     ) -> Option<(Direction, TextureCoords, f64)> {
         let point_0 = position.translate(self.p1);
         let point_1 = position.translate(self.p2);
@@ -151,22 +161,174 @@ impl Triangle {
 
 pub struct Mesh {
     mesh: obj::Object,
-    bb: BoundingBox,
-    triangles: Vec<Triangle>,
-    root: MeshTreeNode
+    root: MeshTreeNode,
 }
 
 enum MeshTreeNode {
-    Node(Box<MeshTreeNode>, Box<MeshTreeNode>),
-    Leaf(Vec<Triangle>)
+    Node(BoundingBox, Box<MeshTreeNode>, Box<MeshTreeNode>),
+    Leaf(BoundingBox, Vec<Triangle>),
+}
+
+#[inline]
+fn min4(a: f64, b: f64, c: f64, d: f64) -> f64 {
+    a.min(b).min(c).min(d)
+}
+
+#[inline]
+fn max4(a: f64, b: f64, c: f64, d: f64) -> f64 {
+    a.max(b).max(c).max(d)
+}
+
+#[derive(Debug)]
+enum SplitRule {
+    X(f64),
+    Y(f64),
+    Z(f64),
+}
+
+enum SplitResult<T> {
+    Left(T),
+    Right(T),
+}
+
+impl SplitRule {
+    fn sort_to(&self, t: Triangle) -> SplitResult<Triangle> {
+        let center = t.center();
+        match self {
+            SplitRule::X(ref bp) => {
+                if center.x < *bp {
+                    SplitResult::Left(t)
+                } else {
+                    SplitResult::Right(t)
+                }
+            }
+            SplitRule::Z(ref bp) => {
+                if center.z < *bp {
+                    SplitResult::Left(t)
+                } else {
+                    SplitResult::Right(t)
+                }
+            }
+            SplitRule::Y(ref bp) => {
+                if center.y < *bp {
+                    SplitResult::Left(t)
+                } else {
+                    SplitResult::Right(t)
+                }
+            }
+        }
+    }
+}
+
+impl MeshTreeNode {
+    pub fn create(triangles: Vec<Triangle>) -> MeshTreeNode {
+        let bb = MeshTreeNode::create_bounding_box(&triangles);
+
+        if triangles.len() <= 250 {
+            return MeshTreeNode::Leaf(bb, triangles);
+        }
+
+        let (left, right) = MeshTreeNode::split_triangles(&bb, triangles);
+
+        MeshTreeNode::Node(bb, Box::new(left), Box::new(right))
+    }
+
+    fn split_triangles(bb: &BoundingBox, triangles: Vec<Triangle>) -> (MeshTreeNode, MeshTreeNode) {
+        let delta_x = (bb.min.x - bb.max.x).abs();
+        let delta_y = (bb.min.y - bb.max.y).abs();
+        let delta_z = (bb.min.z - bb.max.z).abs();
+
+        let split_rule = if delta_x > delta_y && delta_x > delta_z {
+            // split in x
+            SplitRule::X(bb.min.x + delta_x / 2.0)
+        } else if delta_y > delta_x && delta_y > delta_z {
+            // split in y
+            SplitRule::Y(bb.min.y + delta_y / 2.0)
+        } else {
+            // split in z
+            SplitRule::Z(bb.min.z + delta_z / 2.0)
+        };
+
+        let mut left = Vec::new();
+        let mut right = Vec::new();
+        for tri in triangles {
+            match split_rule.sort_to(tri) {
+                SplitResult::Left(tri) => left.push(tri),
+                SplitResult::Right(tri) => right.push(tri),
+            }
+        }
+        (MeshTreeNode::create(left), MeshTreeNode::create(right))
+    }
+
+    fn create_bounding_box(triangles: &Vec<Triangle>) -> BoundingBox {
+        let first_vert = triangles.get(0).unwrap().p1;
+        let pmin = first_vert.clone();
+        let pmax = first_vert.clone();
+
+        let (pmin, pmax) = triangles.iter().fold((pmin, pmax), |(pmin, pmax), t| {
+            (
+                Point {
+                    x: min4(pmin.x, t.p1.x, t.p2.x, t.p3.x),
+                    y: min4(pmin.y, t.p1.y, t.p2.y, t.p3.y),
+                    z: min4(pmin.z, t.p1.z, t.p2.z, t.p3.z),
+                },
+                Point {
+                    x: max4(pmax.x, t.p1.x, t.p2.x, t.p3.x),
+                    y: max4(pmax.y, t.p1.y, t.p2.y, t.p3.y),
+                    z: max4(pmax.z, t.p1.z, t.p2.z, t.p3.z),
+                },
+            )
+        });
+
+        BoundingBox {
+            min: pmin,
+            max: pmax,
+        }
+    }
+
+    fn intersect(
+        &self,
+        ray: &Ray,
+        position: &WorldPosition,
+    ) -> Option<(Direction, TextureCoords, f64)> {
+        match self {
+            MeshTreeNode::Leaf(bbox, triangles) => {
+                if !bbox.intersects(ray, position) {
+                    return None;
+                }
+
+                triangles
+                    .iter()
+                    .filter_map(|triangle| triangle.intersects(ray, position))
+                    .min_by(|f1, f2| f1.2.partial_cmp(&f2.2).unwrap())
+            }
+            MeshTreeNode::Node(bbox, a, b) => {
+                if !bbox.intersects(ray, position) {
+                    return None;
+                }
+
+                let left_match = a.intersect(ray, position);
+                let right_match = b.intersect(ray, position);
+
+                match (left_match, right_match) {
+                    (Some(x), None) => return Some(x),
+                    (None, Some(x)) => return Some(x),
+                    (None, None) => None,
+                    (Some(x), Some(y)) => {
+                        if x.2 < y.2 {
+                            Some(x)
+                        } else {
+                            Some(y)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl Structure for Mesh {
-    fn get_intersection(
-        &self,
-        ray: &Ray,
-        position: &WorldPosition
-    ) -> Option<Intersection> {
+    fn get_intersection(&self, ray: &Ray, position: &WorldPosition) -> Option<Intersection> {
         self.intersect(ray, position).map(|result| {
             let (normal, texc, distance) = result;
             let hit_point = ray.origin + ray.direction * distance;
@@ -179,53 +341,14 @@ impl Mesh {
     fn intersect(
         &self,
         ray: &Ray,
-        position: &WorldPosition
+        position: &WorldPosition,
     ) -> Option<(Direction, TextureCoords, f64)> {
-        if !self.check_bb(ray, position) {
-            return None;
-        }
-
-        self.triangles
-            .iter()
-            .filter_map(|triangle| triangle.intersects(ray, position))
-            .min_by(|f1, f2| f1.2.partial_cmp(&f2.2).unwrap())
-    }
-
-    fn create_bounding_box(obj: &obj::Object) -> BoundingBox {
-        let first_vert = obj.vertices.get(0).unwrap();
-        let min = (first_vert.x, first_vert.y, first_vert.z);
-        let max = (first_vert.x, first_vert.y, first_vert.z);
-
-        let (min, max) = obj.vertices.iter().fold((min, max), |(min, max), &v| {
-            (
-                (min.0.min(v.x), min.1.min(v.y), min.2.min(v.z)),
-                (max.0.max(v.x), max.1.max(v.y), max.2.max(v.z)),
-            )
-        });
-
-        let a = Point {
-            x: min.0,
-            y: min.1,
-            z: min.2,
-        };
-        let b = Point {
-            x: max.0,
-            y: max.1,
-            z: max.2,
-        };
-
-        BoundingBox { min: a, max: b }
-    }
-
-    fn check_bb(&self, ray: &Ray, position: &WorldPosition) -> bool {
-        self.bb.intersects(ray, position)
+        self.root.intersect(ray, position)
     }
 
     pub fn create(obj: obj::Object) -> Mesh {
         Mesh {
-            bb: Mesh::create_bounding_box(&obj),
-            triangles: Mesh::build_triangles(&obj),
-            root: MeshTreeNode::Leaf(Mesh::build_triangles(&obj)),
+            root: MeshTreeNode::create(Mesh::build_triangles(&obj)),
             mesh: obj,
         }
     }
@@ -260,173 +383,5 @@ impl Mesh {
             })
             .flatten()
             .collect()
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use cgmath::{One, Quaternion};
-    use objects::mesh::{Mesh, Triangle};
-    use objects::ObjectBuilder;
-    use objects::{Sphere, Structure, WorldPosition};
-    use raycast::IntersectionResult;
-    use raycast::Ray;
-    use raycast::SurfaceProperties;
-    use scene::Scene;
-    use types::Color;
-    use types::{Direction, Point, Scale};
-    use wavefront_obj;
-
-    #[test]
-    /*fn test_triangle_intersection() {
-        let tri = Triangle {
-            p1: Point { x: 2.0, y: 0.0, z: 2.0 },
-            p2: Point { x: 2.0, y: 0.0, z: -2.0 },
-            p3: Point { x: -2.0, y: 0.0, z: -2.0 },
-            normals: None,
-        };
-
-        let ray = Ray { origin: Point { x: 0.0, y: -1.0, z: 0.0 }, direction: Direction { x: 0.0, y: 1.0, z: 0.0 } };
-
-        let intersections = tri.intersects(&ray);
-
-        assert_eq!(true, intersections.is_some());
-        let inter = intersections.unwrap();
-        let pos = inter.0;
-        let distance = inter.2;
-        let hit_point = ray.origin + ray.direction * distance;
-        assert_eq!(distance, 1.0, "distance wrong");
-        assert_eq!(hit_point.x, 0.0, "x coord wrong");
-        assert_eq!(hit_point.y, 0.0, "y coord wrong");
-        assert_eq!(hit_point.z, 0.0, "z coord wrong");
-    }*/
-    #[test]
-    fn test_simple_mesh_intersection() {
-        let simple = String::from(
-            r#"
-            v  2.0 0.0  2.0  # 1
-            v  2.0 0.0 -2.0  # 2
-            v -2.0 0.0 -2.0  # 3
-            f 1 2 3
-        "#,
-        );
-        let model_read = wavefront_obj::obj::parse(simple);
-        if let Err(err) = model_read {
-            panic!("{:?}", err);
-        }
-
-        let read_uw = model_read.unwrap();
-        let model = read_uw.objects.get(0);
-
-        let zero = Point {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-        };
-
-        let mesh = Mesh {
-            mesh: model.unwrap().clone(),
-            bb: (zero.clone(), Sphere::create(2.0)),
-        };
-
-        let ray = Ray {
-            origin: Point {
-                x: 0.0,
-                y: -1.0,
-                z: 0.0,
-            },
-            direction: Direction {
-                x: 0.0,
-                y: 1.0,
-                z: 0.0,
-            },
-        };
-
-        let intersections = mesh.get_intersection(
-            &ray,
-            &WorldPosition {
-                position: zero.clone(),
-                rotation: Quaternion::one(),
-            },
-            &1.0f64,
-        );
-
-        assert_eq!(true, intersections.is_some());
-    }
-
-    #[test]
-    fn test_shadow_ray_collides() {
-        let simple = String::from(
-            r#"
-            v  2.0 0.0  2.0  # 1
-            v  2.0 0.0 -2.0  # 2
-            v -2.0 0.0 -2.0  # 3
-            f 1 2 3
-        "#,
-        );
-        let model_read = wavefront_obj::obj::parse(simple);
-        if let Err(err) = model_read {
-            panic!("{:?}", err);
-        }
-
-        let read_uw = model_read.unwrap();
-        let model = read_uw.objects.get(0);
-
-        let zero = Point {
-            x: 0.0,
-            y: 0.0,
-            z: 0.0,
-        };
-
-        let mesh = Mesh {
-            mesh: model.unwrap().clone(),
-            bb: (zero.clone(), Sphere::create(2.0)),
-        };
-
-        let scene = Scene {
-            width: 100,
-            height: 100,
-            fov: 90.0,
-            objects: vec![ObjectBuilder::create_for(mesh).into()],
-            lights: Vec::new(),
-        };
-
-        let to_light = Direction {
-            x: 0.0,
-            y: 1.0,
-            z: 0.0,
-        };
-        let ray = Ray {
-            origin: Point {
-                x: 0.0,
-                y: -1.0,
-                z: 0.0,
-            },
-            direction: to_light.clone(),
-        };
-        let result = scene.trace(&ray);
-        assert!(result.is_some());
-        let inter = IntersectionResult {
-            distance: 0.0,
-            hit_point: Point {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
-            surface_normal: Vector {
-                x: 0.0,
-                y: 1.0,
-                z: 0.0,
-            },
-            surface: SurfaceProperties {
-                albedo: 0.0,
-                color: Color::from_rgb(0.0, 0.0, 0.0),
-                reflectivity: None,
-            },
-        };
-
-        let ray = Ray::create_shadow_ray(to_light.clone(), &inter);
-        let result = scene.trace(&ray);
-        assert!(result.is_some());
     }
 }

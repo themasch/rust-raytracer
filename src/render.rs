@@ -9,7 +9,8 @@ use threadpool::ThreadPool;
 
 use image::{DynamicImage, GenericImage};
 use raycast::{IntersectionResult, Ray};
-use scene::{Scene, Camera};
+use scene::{Camera, Scene};
+use std::time::{Duration, Instant};
 use types::Color;
 
 fn shade_diffuse(scene: &Scene, intersection: &IntersectionResult) -> Color {
@@ -17,7 +18,7 @@ fn shade_diffuse(scene: &Scene, intersection: &IntersectionResult) -> Color {
     for light in &scene.lights {
         let direction_to_light = (-light.direction()).normalize();
         let shadow_ray = Ray::create_shadow_ray(direction_to_light, intersection);
-        let shadow_trace : Option<IntersectionResult> = scene.trace(&shadow_ray);
+        let shadow_trace: Option<IntersectionResult> = scene.trace(&shadow_ray);
         if shadow_trace.is_none() {
             let light_intensity = light.intensity();
             let light_power = (intersection.surface_normal().dot(direction_to_light) as f32).abs();
@@ -79,19 +80,23 @@ pub fn render(scene: Scene, camera: Camera) -> DynamicImage {
         let tx = tx.clone();
         let camera = camera.clone();
         pool.execute(move || {
+            let start = Instant::now();
             let tile_width = min(mx + tile_size, sw) - mx;
             let tile_height = min(my + tile_size, sh) - my;
             let mut image = DynamicImage::new_rgb8(tile_width, tile_height);
 
+            let mut trace_total = Duration::new(0, 0);
+            let mut color_total = Duration::new(0, 0);
             for x in 0..tile_width {
                 for y in 0..tile_height {
-                    if !(mx + x > 380 && mx + x < 420 && my + y > 80 && my + y < 100) {
-                        //  continue;
-                    }
                     let ray = Ray::create_prime(mx + x, my + y, &*mscene, &camera);
-
-                    if let Some(inter) = mscene.trace(&ray) {
+                    let trace_start = Instant::now();
+                    let trace = mscene.trace(&ray);
+                    trace_total += trace_start.elapsed();
+                    if let Some(inter) = trace {
+                        let color_start = Instant::now();
                         let color = get_color(&*mscene, &ray, &inter, 0);
+                        color_total += color_start.elapsed();
                         image.put_pixel(x, y, color.clamp().to_rgba8());
                     } else {
                         image.put_pixel(x, y, black);
@@ -99,6 +104,12 @@ pub fn render(scene: Scene, camera: Camera) -> DynamicImage {
                 }
             }
             tx.send((image, mx, my)).unwrap();
+            println!(
+                "quad done in {:?}, traces took {:?}, color took: {:?}",
+                start.elapsed(),
+                trace_total,
+                color_total
+            );
         });
     }
 
