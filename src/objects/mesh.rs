@@ -4,6 +4,38 @@ use raycast::{Intersection, Ray, RayType};
 use types::{Direction, Point, Scale};
 use wavefront_obj::obj;
 
+struct BoundingBox {
+    min: Point,
+    max: Point
+}
+
+impl BoundingBox {
+    pub fn intersects(&self, ray: &Ray, position: &WorldPosition) -> bool {
+        let pmin = position.translate(self.min);
+        let pmax = position.translate(self.max);
+
+        let tx1 = (pmin.x - ray.origin.x) * ray.inv_direction.x;
+        let tx2 = (pmax.x - ray.origin.x) * ray.inv_direction.x;
+
+        let mut tmin = tx1.min(tx2);
+        let mut tmax = tx1.max(tx2);
+
+        let ty1 = (pmin.y - ray.origin.y) * ray.inv_direction.y;
+        let ty2 = (pmax.y - ray.origin.y) * ray.inv_direction.y;
+
+        tmin = tmin.max(ty1.min(ty2));
+        tmax = tmax.min(ty1.max(ty2));
+
+        let tz1 = (pmin.z - ray.origin.z) * ray.inv_direction.z;
+        let tz2 = (pmax.z - ray.origin.z) * ray.inv_direction.z;
+
+        tmin = tmin.max(tz1.min(tz2));
+        tmax = tmax.min(tz1.max(tz2));
+
+        tmax >= tmin && tmax >= 0.0
+    }
+}
+
 const EPSILON: f64 = 1e-13;
 
 pub struct Triangle {
@@ -118,9 +150,15 @@ impl Triangle {
 }
 
 pub struct Mesh {
-    pub mesh: obj::Object,
-    pub bb: (Point, Sphere),
-    pub triangles: Vec<Triangle>,
+    mesh: obj::Object,
+    bb: BoundingBox,
+    triangles: Vec<Triangle>,
+    root: MeshTreeNode
+}
+
+enum MeshTreeNode {
+    Node(Box<MeshTreeNode>, Box<MeshTreeNode>),
+    Leaf(Vec<Triangle>)
 }
 
 impl Structure for Mesh {
@@ -153,7 +191,7 @@ impl Mesh {
             .min_by(|f1, f2| f1.2.partial_cmp(&f2.2).unwrap())
     }
 
-    fn create_bounding_box(obj: &obj::Object) -> (Point, Sphere) {
+    fn create_bounding_box(obj: &obj::Object) -> BoundingBox {
         let first_vert = obj.vertices.get(0).unwrap();
         let min = (first_vert.x, first_vert.y, first_vert.z);
         let max = (first_vert.x, first_vert.y, first_vert.z);
@@ -176,31 +214,18 @@ impl Mesh {
             z: max.2,
         };
 
-        let center = Point::midpoint(a, b);
-        let distance = center.distance(a);
-
-        return (center, Sphere::create(distance));
+        BoundingBox { min: a, max: b }
     }
 
     fn check_bb(&self, ray: &Ray, position: &WorldPosition) -> bool {
-        let center = self.bb.0 + position.position.to_vec();
-        self.bb
-            .1
-            .get_intersection(
-                ray,
-                &WorldPosition {
-                    position: center,
-                    rotation: position.rotation,
-                    scale: position.scale
-                }
-            )
-            .is_some()
+        self.bb.intersects(ray, position)
     }
 
     pub fn create(obj: obj::Object) -> Mesh {
         Mesh {
             bb: Mesh::create_bounding_box(&obj),
             triangles: Mesh::build_triangles(&obj),
+            root: MeshTreeNode::Leaf(Mesh::build_triangles(&obj)),
             mesh: obj,
         }
     }

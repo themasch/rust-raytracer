@@ -55,6 +55,7 @@ pub enum RayType {
 pub struct Ray {
     pub origin: Point,
     pub direction: Direction,
+    pub inv_direction: Direction,
     pub ray_type: RayType,
 }
 
@@ -65,24 +66,34 @@ impl Ray {
         let sensor_x =
             (((x as f64 + 0.5) / scene.width as f64) * 2.0 - 1.0) * aspect_ratio * fov_adjustment;
         let sensor_y = (1.0 - ((y as f64 + 0.5) / scene.height as f64) * 2.0) * fov_adjustment;
-
+        let direction = Direction {
+            x: sensor_x,
+            y: sensor_y,
+            z: -1.0,
+        }
+            .normalize();
         Ray {
             origin: Point::new(0.0, 0.0, 0.0),
-            direction: Direction {
-                x: sensor_x,
-                y: sensor_y,
-                z: -1.0,
-            }
-            .normalize(),
+            inv_direction: Direction {
+                x: 1.0 / direction.x,
+                y: 1.0 / direction.y,
+                z: 1.0 / direction.z
+            },
+            direction: direction,
             ray_type: RayType::Prime,
         }
     }
 
     pub fn create_reflection(ray_direction: &Direction, int: &IntersectionResult) -> Ray {
+        let direction = ray_direction - (2.0 * ray_direction.dot(int.surface_normal()) * int.surface_normal());
         Ray {
             origin: int.reflection_origin(),
-            direction: ray_direction
-                - (2.0 * ray_direction.dot(int.surface_normal()) * int.surface_normal()),
+            inv_direction: Direction {
+                x: 1.0 / direction.x,
+                y: 1.0 / direction.y,
+                z: 1.0 / direction.z
+            },
+            direction: direction,
             ray_type: RayType::Reflection,
         }
     }
@@ -90,6 +101,11 @@ impl Ray {
     pub fn create_shadow_ray(direction_to_light: Direction, int: &IntersectionResult) -> Ray {
         Ray {
             origin: int.reflection_origin(),
+            inv_direction: Direction {
+                x: 1.0 / direction_to_light.x,
+                y: 1.0 / direction_to_light.y,
+                z: 1.0 / direction_to_light.z
+            },
             direction: direction_to_light,
             ray_type: RayType::Shadow,
         }
