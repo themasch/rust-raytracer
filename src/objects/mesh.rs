@@ -129,29 +129,27 @@ impl Triangle {
         let pvec = ray.direction.cross(edge_2);
 
         let det = edge_1.dot(pvec);
-        if det < EPSILON {
+        if det < EPSILON && det > -EPSILON {
             return None;
         }
 
-        let tvec = ray.origin - point_0;
-        let u = tvec.dot(pvec);
+        let inv_det = 1.0 / det;
 
-        if u < 0.0 || u > det {
+        let tvec = ray.origin - point_0;
+        let u = tvec.dot(pvec) * inv_det;
+
+        if u < 0.0 || u > 1.0 {
             return None;
         }
 
         let qvec = tvec.cross(edge_1);
-        let v = ray.direction.dot(qvec);
+        let v = ray.direction.dot(qvec) * inv_det;
 
-        if v < 0.0 || u + v > det {
+        if v < 0.0 || u + v > 1.0 {
             return None;
         }
 
-        let t = edge_2.dot(qvec);
-        let inv_det = 1.0 / det;
-        let t = t * inv_det;
-        let u = u * inv_det;
-        let v = v * inv_det;
+        let t = edge_2.dot(qvec) * inv_det;
 
         let normal = self.surface_normal(u, v, position);
 
@@ -304,7 +302,7 @@ impl MeshTreeNode {
             }
             MeshTreeNode::Node(bbox, a, b) => {
                 if !bbox.intersects(ray, position) {
-                    return None;
+                   return None;
                 }
 
                 let left_match = a.intersect(ray, position);
