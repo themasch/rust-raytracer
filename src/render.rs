@@ -7,6 +7,7 @@ use cgmath::prelude::*;
 use num_cpus;
 use threadpool::ThreadPool;
 
+use image::Rgba;
 use image::{DynamicImage, GenericImage};
 use raycast::{IntersectionResult, Ray};
 use scene::{Camera, Scene};
@@ -57,6 +58,48 @@ pub fn cast_ray(scene: &Scene, ray: &Ray, depth: u32) -> Color {
         .unwrap_or(Color::from_rgb(0.0, 0.0, 0.0))
 }
 
+pub fn sample(x: f64, y: f64, scene: &Scene, camera: &Camera) -> Option<Rgba<u8>> {
+    let ray = Ray::create_prime(x, y, &scene, &camera);
+    let trace = scene.trace(&ray);
+    trace.map(|inter| {
+        let color = get_color(&scene, &ray, &inter, 0);
+        color.clamp().to_rgba8()
+    })
+}
+
+pub fn average_color(samples: Vec<Rgba<u8>>) -> Rgba<u8> {
+    let sample_count = samples.len();
+    let data: [usize; 4] = samples.iter().fold([0, 0, 0, 0], |mut data, sample| {
+        data[0] = data[0] + sample.data[0] as usize;
+        data[1] = data[1] + sample.data[1] as usize;
+        data[2] = data[2] + sample.data[2] as usize;
+        data[3] = data[3] + sample.data[3] as usize;
+        data
+    });
+
+    let data: [u8; 4] = [
+        (data[0] / sample_count) as u8,
+        (data[1] / sample_count) as u8,
+        (data[2] / sample_count) as u8,
+        (data[3] / sample_count) as u8,
+    ];
+
+    Rgba(data)
+}
+
+pub fn super_sample(x: f64, y: f64, scene: &Scene, camera: &Camera) -> Option<Rgba<u8>> {
+    let black = Color::from_rgb(0.0, 0.0, 0.0).to_rgba8();
+    let samples = vec![
+        sample((x - 0.25), (y - 0.25), scene, camera).unwrap_or(black),
+        sample((x + 0.25), (y - 0.25), scene, camera).unwrap_or(black),
+        sample((x - 0.25), (y + 0.25), scene, camera).unwrap_or(black),
+        sample((x + 0.25), (y + 0.25), scene, camera).unwrap_or(black),
+        sample((x), (y), scene, camera).unwrap_or(black),
+    ];
+
+    Some(average_color(samples))
+}
+
 pub fn render(scene: Scene, camera: Camera) -> DynamicImage {
     let workers = num_cpus::get();
     let pool = ThreadPool::new(workers);
@@ -85,31 +128,14 @@ pub fn render(scene: Scene, camera: Camera) -> DynamicImage {
             let tile_height = min(my + tile_size, sh) - my;
             let mut image = DynamicImage::new_rgb8(tile_width, tile_height);
 
-            let mut trace_total = Duration::new(0, 0);
-            let mut color_total = Duration::new(0, 0);
             for x in 0..tile_width {
                 for y in 0..tile_height {
-                    let ray = Ray::create_prime(mx + x, my + y, &*mscene, &camera);
-                    let trace_start = Instant::now();
-                    let trace = mscene.trace(&ray);
-                    trace_total += trace_start.elapsed();
-                    if let Some(inter) = trace {
-                        let color_start = Instant::now();
-                        let color = get_color(&*mscene, &ray, &inter, 0);
-                        color_total += color_start.elapsed();
-                        image.put_pixel(x, y, color.clamp().to_rgba8());
-                    } else {
-                        image.put_pixel(x, y, black);
-                    }
+                    let color = super_sample((mx + x) as f64, (my + y) as f64, &mscene, &camera)
+                        .unwrap_or(black);
+                    image.put_pixel(x, y, color);
                 }
             }
             tx.send((image, mx, my)).unwrap();
-            println!(
-                "quad done in {:?}, traces took {:?}, color took: {:?}",
-                start.elapsed(),
-                trace_total,
-                color_total
-            );
         });
     }
 

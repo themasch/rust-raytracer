@@ -302,7 +302,7 @@ impl MeshTreeNode {
             }
             MeshTreeNode::Node(bbox, a, b) => {
                 if !bbox.intersects(ray, position) {
-                   return None;
+                    return None;
                 }
 
                 let left_match = a.intersect(ray, position);

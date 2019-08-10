@@ -60,7 +60,7 @@ pub struct Ray {
 }
 
 impl Ray {
-    pub fn create_prime(x: u32, y: u32, scene: &Scene, camera: &Camera) -> Ray {
+    pub fn create_prime(x: f64, y: f64, scene: &Scene, camera: &Camera) -> Ray {
         let direction = camera.to_sensor_direction(x as f64, y as f64);
         Ray {
             origin: Point::new(0.0, 0.0, 0.0),
